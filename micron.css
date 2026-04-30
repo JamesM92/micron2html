@@ -17,16 +17,43 @@
 .mu-line  { white-space: pre-wrap; word-break: break-word; }
 .mu-blank { height: 1em; }
 
-.mu-h1 { font-size: 16px; font-weight: bold; color: #ffffff; margin: 12px 0 6px; }
-.mu-h2 { font-size: 14px; font-weight: bold; color: #ffffff; margin: 10px 0 5px; }
-.mu-h3 { font-size: 13px; font-weight: bold; color: #ffffff; margin:  8px 0 4px; }
+/* Section headings — rendered as inline coloured blocks like NomadNet's TUI.
+ * `display: inline-block` keeps the highlight tight to the title text instead
+ * of stretching the full line. The `* { color: inherit !important }` rule is
+ * deliberate: author-supplied `Fxxx` colour codes inside heading content emit
+ * inline `style="color:..."` spans which would otherwise produce illegible
+ * text against the heading background. Forcing inheritance lets the bg/fg
+ * pairing here win regardless of what the document author wrote. */
+.mu-h1, .mu-h2, .mu-h3 {
+  display: inline-block;
+  font-weight: bold;
+  padding: 1px 8px;
+  margin: 12px 0 6px;
+}
+.mu-h1 { background: #d8b34c; color: #1a1a1a !important; font-size: 14px; }
+.mu-h2 { background: #4d6f8f; color: #ffffff !important; font-size: 13px; margin: 10px 0 5px; }
+.mu-h3 { background: #3a3a3a; color: #ffffff !important; font-size: 13px; margin:  8px 0 4px; padding: 0 6px; }
+.mu-h1 *, .mu-h2 *, .mu-h3 * {
+  color: inherit !important;
+  background-color: transparent !important;
+}
 
+/* Single-character dashes -> a thin rule.
+ * Mixed `-=` / `=-` -> a double rule rendered as two parallel thin lines
+ * to mirror NomadNet's terminal "row of equals signs" style. */
 .mu-hr {
   border: none;
-  border-top: 1px solid #555555;
+  border-top: 1px solid #888888;
   margin: 8px 0;
 }
-.mu-hr-double { border-top: 3px double #555555; }
+.mu-hr-double {
+  border: none;
+  border-top: 1px solid #cccccc;
+  border-bottom: 1px solid #cccccc;
+  height: 3px;
+  margin: 12px 0;
+  background: transparent;
+}
 
 .mu-divider {
   text-align: center;
