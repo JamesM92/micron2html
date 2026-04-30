@@ -38,9 +38,9 @@ Homepage = "https://github.com/JamesM92/Micron2HTML"
 Repository = "https://github.com/JamesM92/Micron2HTML"
 Issues = "https://github.com/JamesM92/Micron2HTML/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["micron2html*"]
+[tool.setuptools]
+packages = ["micron2html"]
+package-dir = {"micron2html" = "."}
 
 [tool.setuptools.package-data]
 micron2html = ["micron.css"]
