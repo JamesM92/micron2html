@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Micron2HTML"
+version = "1.0.0"
+description = "Convert Micron markup (NomadNet) to HTML"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "James Manley", email = "jamesmanley1992@gmail.com" }
+]
+keywords = ["nomadnet", "reticulum", "micron", "markup", "html", "converter"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Topic :: Internet :: WWW/HTTP",
+]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+micron-convert = "micron2html.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/JamesM92/Micron2HTML"
+Repository = "https://github.com/JamesM92/Micron2HTML"
+Issues = "https://github.com/JamesM92/Micron2HTML/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["micron2html*"]
+
+[tool.setuptools.package-data]
+micron2html = ["micron.css"]

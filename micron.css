@@ -1,0 +1,74 @@
+/* Micron2HTML — default stylesheet
+ *
+ * Drop this in alongside the converter's HTML output for instant rendering
+ * matching NomadNet's terminal aesthetic. All rules are scoped to .mu-* classes
+ * so they won't bleed into the rest of your page.
+ */
+
+.mu-page {
+  font-family: "Cascadia Code", "JetBrains Mono", "Consolas", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #aaaaaa;
+  background: #000000;
+  padding: 8px 12px;
+}
+
+.mu-line  { white-space: pre-wrap; word-break: break-word; }
+.mu-blank { height: 1em; }
+
+.mu-h1 { font-size: 16px; font-weight: bold; color: #ffffff; margin: 12px 0 6px; }
+.mu-h2 { font-size: 14px; font-weight: bold; color: #ffffff; margin: 10px 0 5px; }
+.mu-h3 { font-size: 13px; font-weight: bold; color: #ffffff; margin:  8px 0 4px; }
+
+.mu-hr {
+  border: none;
+  border-top: 1px solid #555555;
+  margin: 8px 0;
+}
+.mu-hr-double { border-top: 3px double #555555; }
+
+.mu-divider {
+  text-align: center;
+  color: #555555;
+  letter-spacing: 0.2em;
+  margin: 6px 0;
+}
+
+.mu-link {
+  color: #5ba3c9;
+  text-decoration: underline;
+}
+.mu-link:hover { color: #7ec8e3; }
+
+.mu-dynamic {
+  color: #c8905b;
+  font-style: italic;
+}
+
+.mu-ul { text-decoration: underline; }
+
+.mu-literal {
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #1c1c1c;
+  border: 1px solid #333333;
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+
+.mu-field {
+  font-family: inherit;
+  font-size: inherit;
+  background: #1c1c1c;
+  border: 1px solid #555555;
+  color: #aaaaaa;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+.mu-field:focus { outline: none; border-color: #5ba3c9; }
+.mu-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
