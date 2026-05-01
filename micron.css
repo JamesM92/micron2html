@@ -1,101 +1,197 @@
-/* Micron2HTML — default stylesheet
+/* Micron2HTML — default stylesheet (v1.0.2)
  *
  * Drop this in alongside the converter's HTML output for instant rendering
- * matching NomadNet's terminal aesthetic. All rules are scoped to .mu-* classes
- * so they won't bleed into the rest of your page.
+ * that matches Reticulum MeshChat's NomadNet renderer. All rules are scoped
+ * to .mu-* classes so they won't bleed into the rest of your page.
+ *
+ * Pairs with the bundled `RobotoMonoNerdFont-Regular.ttf` (CC BY 4.0, by
+ * Christian Robertson + Nerd Fonts contributors) — drop both files in the
+ * same directory and the @font-face below picks it up automatically.
  */
 
+@font-face {
+  font-family: 'Roboto Mono Nerd Font';
+  src: url('./RobotoMonoNerdFont-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---- Page wrapper -----------------------------------------------------
+ * Emitted when the source has `#!bg=` or `#!fg=` headers; otherwise the
+ * Micron content is bare. For standalone use, wrap your converter output
+ * in `<div class="mu-page">` to get the full terminal aesthetic. */
 .mu-page {
-  font-family: "Cascadia Code", "JetBrains Mono", "Consolas", "Courier New", monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #aaaaaa;
+  font-family: "Roboto Mono Nerd Font", "Cascadia Code", "JetBrains Mono",
+               "Consolas", "Courier New", monospace;
+  font-size: 16.64px;
+  line-height: normal;
+  color: #dddddd;
   background: #000000;
-  padding: 8px 12px;
+  padding: 12px;
+  white-space: pre;
+  /* Only the Regular weight ships with Micron2HTML — disable browser
+   * synthesis so faux-bold doesn't break monospace alignment in centred
+   * lines that mix bold and non-bold spans. Use the text-shadow trick
+   * below to fake a bold visual without changing character widths. */
+  font-synthesis-weight: none;
+  font-kerning: none;
+  /* No line-wrap on Micron content — long lines scroll horizontally so
+   * box-drawing diagrams and ASCII art stay aligned. */
+  overflow: auto;
 }
 
-.mu-line  { white-space: pre-wrap; word-break: break-word; }
-.mu-blank { height: 1em; }
-
-/* Section headings — rendered as inline coloured blocks like NomadNet's TUI.
- * `display: inline-block` keeps the highlight tight to the title text instead
- * of stretching the full line. The `* { color: inherit !important }` rule is
- * deliberate: author-supplied `Fxxx` colour codes inside heading content emit
- * inline `style="color:..."` spans which would otherwise produce illegible
- * text against the heading background. Forcing inheritance lets the bg/fg
- * pairing here win regardless of what the document author wrote. */
+/* ---- Section headings (MeshChat STYLES_DARK) ----
+ * heading1: bg #bbbbbb, default fg #222222 (overridable by author Fxxx)
+ * heading2: bg #999999, default fg #111111
+ * heading3: bg #777777, default fg #000000
+ *
+ * The bg always extends to the container's left edge; the heading text is
+ * tabbed in via `padding-left` (set inline by the converter from depth). */
 .mu-h1, .mu-h2, .mu-h3 {
-  display: inline-block;
+  display: block;
+  font-family: inherit;
   font-weight: bold;
-  padding: 1px 8px;
-  margin: 12px 0 6px;
+  /* Closing the inflated leading the Nerd Font carries — keeps adjacent
+   * box-drawing rows touching across the heading. Scales with font-size. */
+  margin: 0 0 -1.08em 0;
+  white-space: pre;
 }
-.mu-h1 { background: #d8b34c; color: #1a1a1a !important; font-size: 14px; }
-.mu-h2 { background: #4d6f8f; color: #ffffff !important; font-size: 13px; margin: 10px 0 5px; }
-.mu-h3 { background: #3a3a3a; color: #ffffff !important; font-size: 13px; margin:  8px 0 4px; padding: 0 6px; }
-.mu-h1 *, .mu-h2 *, .mu-h3 * {
-  color: inherit !important;
-  background-color: transparent !important;
+.mu-h1 { background: #bbbbbb; color: #222222; }
+.mu-h2 { background: #999999; color: #111111; }
+.mu-h3 { background: #777777; color: #000000; }
+
+/* ---- Body lines & blanks --------------------------------------------- */
+.mu-line {
+  display: block;
+  margin: 0 0 -1.08em 0;
+  line-height: 1;
+  white-space: pre;
+}
+.mu-blank {
+  display: block;
+  line-height: 1;
+  height: 1em;
+  margin-bottom: -1.08em;
 }
 
-/* Single-character dashes -> a thin rule.
- * Mixed `-=` / `=-` -> a double rule rendered as two parallel thin lines
- * to mirror NomadNet's terminal "row of equals signs" style. */
+/* ---- Dividers --------------------------------------------------------
+ *   `-` / `--`  → thin solid line (browser-default <hr> with currentColor)
+ *   `-=` / `=-` → row of `=` characters (CSS `::before` content)
+ *   `-X` styled → row of the source char (text-shadow repeats it 150x)
+ * Matches what MeshChat displays via its own browser-default <hr>. */
 .mu-hr {
-  border: none;
-  border-top: 1px solid #888888;
-  margin: 8px 0;
+  display: block;
+  border: 0;
+  border-top: 1px solid currentColor;
+  margin: 0 0 -1.08em 0;
+  height: 0;
 }
 .mu-hr-double {
-  border: none;
-  border-top: 1px solid #cccccc;
-  border-bottom: 1px solid #cccccc;
-  height: 3px;
-  margin: 12px 0;
-  background: transparent;
+  display: block;
+  border: 0;
+  margin: 0 0 -1.08em 0;
+  height: 1em;
+  overflow: hidden;
+  white-space: nowrap;
+  color: inherit;
+  font-family: inherit;
 }
-
+.mu-hr-double::before {
+  content: "================================================================================================================================================================";
+}
 .mu-divider {
-  text-align: center;
-  color: #555555;
-  letter-spacing: 0.2em;
-  margin: 6px 0;
+  display: block;
+  margin: 0 0 -1.08em 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: inherit;
+  text-shadow:
+    1ch 0, 2ch 0, 3ch 0, 4ch 0, 5ch 0, 6ch 0, 7ch 0, 8ch 0, 9ch 0, 10ch 0,
+    11ch 0, 12ch 0, 13ch 0, 14ch 0, 15ch 0, 16ch 0, 17ch 0, 18ch 0, 19ch 0, 20ch 0,
+    21ch 0, 22ch 0, 23ch 0, 24ch 0, 25ch 0, 26ch 0, 27ch 0, 28ch 0, 29ch 0, 30ch 0,
+    31ch 0, 32ch 0, 33ch 0, 34ch 0, 35ch 0, 36ch 0, 37ch 0, 38ch 0, 39ch 0, 40ch 0,
+    41ch 0, 42ch 0, 43ch 0, 44ch 0, 45ch 0, 46ch 0, 47ch 0, 48ch 0, 49ch 0, 50ch 0,
+    51ch 0, 52ch 0, 53ch 0, 54ch 0, 55ch 0, 56ch 0, 57ch 0, 58ch 0, 59ch 0, 60ch 0,
+    61ch 0, 62ch 0, 63ch 0, 64ch 0, 65ch 0, 66ch 0, 67ch 0, 68ch 0, 69ch 0, 70ch 0,
+    71ch 0, 72ch 0, 73ch 0, 74ch 0, 75ch 0, 76ch 0, 77ch 0, 78ch 0, 79ch 0, 80ch 0,
+    81ch 0, 82ch 0, 83ch 0, 84ch 0, 85ch 0, 86ch 0, 87ch 0, 88ch 0, 89ch 0, 90ch 0,
+    91ch 0, 92ch 0, 93ch 0, 94ch 0, 95ch 0, 96ch 0, 97ch 0, 98ch 0, 99ch 0, 100ch 0,
+    101ch 0, 102ch 0, 103ch 0, 104ch 0, 105ch 0, 106ch 0, 107ch 0, 108ch 0, 109ch 0, 110ch 0,
+    111ch 0, 112ch 0, 113ch 0, 114ch 0, 115ch 0, 116ch 0, 117ch 0, 118ch 0, 119ch 0, 120ch 0,
+    121ch 0, 122ch 0, 123ch 0, 124ch 0, 125ch 0, 126ch 0, 127ch 0, 128ch 0, 129ch 0, 130ch 0,
+    131ch 0, 132ch 0, 133ch 0, 134ch 0, 135ch 0, 136ch 0, 137ch 0, 138ch 0, 139ch 0, 140ch 0,
+    141ch 0, 142ch 0, 143ch 0, 144ch 0, 145ch 0, 146ch 0, 147ch 0, 148ch 0, 149ch 0, 150ch 0;
 }
 
+/* ---- Bold (fake-bold via text-shadow) -------------------------------
+ * We only ship the Regular weight, so synthesised bold would shift glyph
+ * widths and break monospace alignment. Drawing the glyph 0.5px to the
+ * right thickens it visually without changing the layout box. */
+strong {
+  font-weight: normal;
+  text-shadow: 0.5px 0 0 currentColor;
+}
+
+/* ---- Links -----------------------------------------------------------
+ * `color: inherit` so the surrounding span colour flows through (matches
+ * MeshChat — links don't have a fixed colour, they take the parser state). */
 .mu-link {
-  color: #5ba3c9;
-  text-decoration: underline;
+  color: inherit;
+  text-decoration: none;
 }
-.mu-link:hover { color: #7ec8e3; }
+.mu-link:hover { text-decoration: underline; }
 
+/* ---- Inline underline & dynamic-include link ---- */
+.mu-ul { text-decoration: underline; }
 .mu-dynamic {
   color: #c8905b;
   font-style: italic;
 }
 
-.mu-ul { text-decoration: underline; }
-
+/* ---- Literal blocks (`= ... `=) --------------------------------------
+ * Plain pre-styled text — no border, no bg, no padding. MeshChat doesn't
+ * box literal content; it flows inline at the same font/colour as the
+ * surrounding paragraph. */
 .mu-literal {
-  font-family: inherit;
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: #1c1c1c;
-  border: 1px solid #333333;
-  padding: 6px 10px;
-  margin: 6px 0;
-}
-
-.mu-field {
+  white-space: pre;
   font-family: inherit;
   font-size: inherit;
-  background: #1c1c1c;
-  border: 1px solid #555555;
-  color: #aaaaaa;
-  padding: 2px 6px;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* ---- Form fields -----------------------------------------------------
+ * Text/password inputs: white background with mid-grey text (matches
+ * MeshChat's disabled-input look). Padding bumped from default browser
+ * metrics so they read at body size. */
+.mu-field {
+  background: #ffffff;
+  border: 1px solid #333333;
+  color: #bababa;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 6px 8px;
   border-radius: 2px;
+  cursor: not-allowed;
+}
+.mu-field:not([disabled]) {
+  color: #bababa;
+  cursor: text;
+  outline: none;
 }
 .mu-field:focus { outline: none; border-color: #5ba3c9; }
-.mu-field:disabled {
-  opacity: 0.5;
+
+input[type="checkbox"], input[type="radio"] {
+  accent-color: #5ba3c9;
+  cursor: pointer;
+  margin: 0 4px 0 0;
+}
+input[type="checkbox"][disabled], input[type="radio"][disabled] {
   cursor: not-allowed;
+  opacity: 0.5;
 }

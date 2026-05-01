@@ -3,6 +3,41 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.2]
+
+### Changed — MeshChat parity pass
+
+The renderer was audited line-by-line against [Reticulum MeshChat](https://github.com/liamcottle/reticulum-meshchat)'s `MicronParser.js` so the same Micron source produces equivalent output in both renderers.
+
+- **Unknown tokens after `` ` `` are now silently consumed.** Previously the converter emitted a literal backtick and reprocessed the next char; MeshChat's parser silently drops both (its `default: break;` branch). Use `` \\` `` to render a literal backtick.
+- **`=-` no longer matches as a divider.** Only lines starting with `-` produce dividers — `=-` falls through and renders as text. Mirrors MeshChat's `if (line[0] === "-")` check.
+- **Line-level background-colour extraction removed.** `_extract_line_bg_color()` is gone; a leading `` `B<color> `` no longer fills the entire row, only the explicit `<span>` segment. MeshChat doesn't apply line-level bg.
+- **24-bit `` `FT<6hex> `` colour format dropped.** MeshChat's parser only handles 3-char colours. The `T` prefix and following 2 chars are now consumed as a (failed) 3-char hex match — the 3 chars are still eaten so they don't leak as visible text.
+- **Invalid hex still consumes 3 chars.** `` `Fxxx `` / `` `Bxxx `` always advance 3 characters after the prefix, with or without valid hex, matching MeshChat's `line.substr(i+1,3); skip = 3;`.
+- **Section indent off-by-one corrected.** Body lines and dividers now use `(section - 1) * 20px` (matching MeshChat's `applySectionIndent`). Previously they used `section * 20px`, indenting one level too deep.
+- **Indent uses `margin-left` consistently** across headings, body lines, dividers, and literal blocks (was a mix of `padding-left` / `margin-left`).
+- **Empty heading line emits `<div class="mu-blank"></div>`** instead of dropping the line entirely. MeshChat's `parseLine` returns null for empty headings and the outer loop appends a `<br>`.
+- **Heading levels 4+ render as `mu-line`.** Only `mu-h1`, `mu-h2`, `mu-h3` get the bg-block style; `>>>>` and beyond fall back to plain rendering, matching MeshChat's `STYLES_DARK` which only defines `heading1/2/3`.
+- **Heading bg always extends to the container's left edge.** The heading text is offset via `padding-left: (level - 1) * 20px`, but the bg-block itself starts at column 0 regardless of section depth — visually consistent with MeshChat's full-width heading bars.
+- **Literal blocks now carry section indent.** `<pre class="mu-literal">` gets `margin-left: (section - 1) * 20px` so multi-line code/diagram blocks under a `>>` heading indent the same as surrounding body text.
+- **Field syntax now requires a backtick separator** between flags|name and the default/label, matching MeshChat's `parseField`. The signature of `_render_field()` changed to take `field_content` and `field_data` as separate arguments. Malformed fields (no backtick before `>`) cause the `` `< `` to be silently eaten — same broken behaviour as MeshChat, useful for cross-renderer parity testing.
+
+### Removed
+
+- Public-API surface: `_extract_line_bg_color()` and the 24-bit `T<6hex>` branch of `_parse_color()` are gone.
+- `_render_field(inner, authenticated)` → `_render_field(field_content, field_data, authenticated)`. Internal helper but worth flagging if any downstream code calls it.
+
+### Tests
+
+- 47 tests in `tests/test_converter.py`, all passing. New cases cover: empty heading → blank, `=-` as text, pure `=`/`~` rows as text, unknown-token consumption, invalid hex 3-char consume, 24-bit format dropped, line-level bg removed, h4 fallback to plain, field-without-backtick eaten.
+
+### Stylesheet & font
+
+- `micron.css` reworked to match MeshChat's rendering — pure `#000` page bg, `#dddddd` body text, MeshChat-parity heading bg-blocks (`#bbb`/`#999`/`#777`), Roboto Mono Nerd Font as the primary face, and the line-gap fix (`-1.08em` margin-bottom on every block element) so box-drawing rows touch.
+- `RobotoMonoNerdFont-Regular.ttf` is now bundled with the package — drop in `micron.css` alongside the converter output and the `@font-face` rule picks up the bundled font automatically. Adds ~2.4 MB to the wheel.
+- Bold rendering uses a `text-shadow` fake-bold so glyph widths are preserved (only the Regular weight ships); `font-synthesis-weight: none` blocks faux bold from breaking monospace alignment.
+- Long Micron lines no longer wrap — content scrolls horizontally inside `.mu-page` so ASCII art and box diagrams stay aligned at any viewport width.
+
 ## [1.0.0]
 
 Initial public release. The project was previously developed under the name `micron-converter` as an internal helper for [NomadDockerNet](https://github.com/JamesM92/NomadDockerNet); v1.0.0 is the first release as a standalone library suitable for use by other projects.

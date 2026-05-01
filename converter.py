@@ -200,7 +200,12 @@ class MicronConverter:
                 doc.literal = False
                 content = html.escape("\n".join(doc.literal_lines))
                 doc.literal_lines = []
-                return f'<pre class="mu-literal">{content}</pre>'
+                # MeshChat parity: literal lines inherit the surrounding
+                # section depth's indent (its parser applies section indent
+                # to every line, literal or not).
+                indent = max(0, doc.section - 1) * 20
+                style_attr = f' style="margin-left:{indent}px"' if indent else ''
+                return f'<pre class="mu-literal"{style_attr}>{content}</pre>'
             doc.literal_lines.append(line)
             return None
 
@@ -238,28 +243,47 @@ class MicronConverter:
             doc.section = level
             heading_text = line[level:].strip()
             if not heading_text:
-                return None  # unnamed section — just changes indentation
+                # MeshChat parity: empty heading line still emits a blank row
+                # (its parseLine returns null and the outer convertMicronToHtml
+                # loop appends a <br>). State (section depth) is updated above.
+                return '<div class="mu-blank"></div>'
             inner = self._parse_inline(heading_text, node_hash, base_path,
                                        authenticated, doc)
-            indent = (level - 1) * 20
-            style = f'padding-left:{indent}px' if indent else ''
-            style_attr = f' style="{style}"' if style else ''
-            cls = "mu-h1" if level == 1 else "mu-h2" if level == 2 else "mu-h3"
+            # Heading bg extends to the container's left edge for ALL levels
+            # (bg starts at 0 regardless of depth). The heading TEXT is
+            # tabbed inward via `padding-left` so deeper headings indent
+            # while their bg still spans the full row.
+            text_indent = (level - 1) * 20
+            style_attr = f' style="padding-left:{text_indent}px"' if text_indent else ''
+            # MeshChat parity: only heading levels 1–3 have a bg block; level
+            # 4+ falls back to the "plain" style (no bg, default fg). We
+            # render levels >3 as `.mu-line` so they get plain rendering.
+            if level == 1:
+                cls = "mu-h1"
+            elif level == 2:
+                cls = "mu-h2"
+            elif level == 3:
+                cls = "mu-h3"
+            else:
+                cls = "mu-line"
             return f'<div class="{cls}"{style_attr}>{inner}</div>'
 
         # ---- Dividers ----
+        # MeshChat parity: only lines starting with `-` produce dividers.
+        # `=-`, `==`, `===` etc. fall through and render as regular text.
         s = line.strip()
-        if s and all(c == "-" for c in s) and len(s) >= 1:
-            indent = doc.section * 20
-            style = f' style="margin-left:{indent}px"' if indent else ''
-            return f'<hr class="mu-hr"{style}>'
-        if s.startswith("-=") or s.startswith("=-"):
-            return '<hr class="mu-hr mu-hr-double">'
-        # Styled divider: -<char(s)>
-        if s.startswith("-") and len(s) > 1 and s[1] not in ("-", "="):
-            char_content = html.escape(s[1:])
-            indent = doc.section * 20
-            style_attr = f' style="padding-left:{indent}px"' if indent else ''
+        if s and s[0] == "-":
+            indent = max(0, doc.section - 1) * 20
+            style_attr = f' style="margin-left:{indent}px"' if indent else ''
+            if len(s) == 1:
+                # `-` alone — thin solid rule (browser-default <hr>)
+                return f'<hr class="mu-hr"{style_attr}>'
+            if s[1] == "=":
+                # `-=` — row of `=` characters
+                return f'<hr class="mu-hr mu-hr-double"{style_attr}>'
+            # `--`, `-~`, `-*`, `-X`, etc. — styled divider; preserve the
+            # character so the renderer can repeat it across the row.
+            char_content = html.escape(s[1])
             return f'<div class="mu-divider"{style_attr}>{char_content}</div>'
 
         # ---- Empty line ----
@@ -267,17 +291,16 @@ class MicronConverter:
             return '<div class="mu-blank"></div>'
 
         # ---- Regular text line ----
-        line_bg = self._extract_line_bg_color(line)
+        # MeshChat parity: no line-level bg from a leading `B` token (its
+        # parser doesn't do that). Bg only applies inside the explicit span.
         inner = self._parse_inline(line, node_hash, base_path, authenticated, doc)
 
         style_parts = []
-        if line_bg:
-            style_parts.append(f"background-color:{line_bg}")
         if doc.align:
             style_parts.append(f"text-align:{doc.align}")
-        indent = doc.section * 20
+        indent = max(0, doc.section - 1) * 20
         if indent:
-            style_parts.append(f"padding-left:{indent}px")
+            style_parts.append(f"margin-left:{indent}px")
 
         style_attr = f' style="{";".join(style_parts)}"' if style_parts else ''
         return f'<div class="mu-line"{style_attr}>{inner}</div>'
@@ -430,15 +453,25 @@ class MicronConverter:
                     else:
                         out.append("[")
 
-                # Field  (`<...>)
+                # Field  (`<flags|name`default>)
+                # MeshChat parity: a field requires a backtick between
+                # `<flags|name` and `default>`. Without it, MeshChat's
+                # parseField returns null and the `<` is silently eaten.
+                # We mirror that exactly so checkbox/radio shorthand that
+                # omits the backtick (`<?|name|value>`, `<^|name|value>`)
+                # produces the same broken render in both renderers.
                 elif nc == "<":
-                    i += 1  # past <
-                    end = text.find(">", i)
-                    if end != -1:
-                        out.append(self._render_field(text[i:end], authenticated))
+                    field_start = i + 1
+                    backtick_pos = text.find("`", field_start)
+                    end = text.find(">", backtick_pos + 1) if backtick_pos != -1 else -1
+                    if backtick_pos != -1 and end != -1:
+                        field_content = text[field_start:backtick_pos]
+                        field_data = text[backtick_pos + 1:end]
+                        out.append(self._render_field(field_content, field_data, authenticated))
                         i = end + 1
                     else:
-                        out.append("<")
+                        # Malformed — eat the `<` silently, matching MeshChat.
+                        i += 1
 
                 # Dynamic include  (`{URL`refresh})
                 elif nc == "{":
@@ -456,8 +489,11 @@ class MicronConverter:
                         i += 1
 
                 else:
-                    # Unknown token — emit literal backtick; reprocess nc next iteration
-                    out.append("`")
+                    # Unknown token — silently consume both the backtick and
+                    # the unknown char, matching the behaviour of NomadNet's
+                    # MicronParser (and Liam Cottle's MicronParser.js port).
+                    # If you want a literal backtick, use `\`` to escape it.
+                    i += 1
 
                 continue
 
@@ -474,25 +510,28 @@ class MicronConverter:
     def _parse_color(self, text: str, i: int, n: int):
         """Parse a Micron color token after the F/B prefix.
 
-        Formats
-          T + 6 hex chars  — 24-bit true color
-          3 hex chars      — each nibble doubled  (f→ff, 8→88, 0→00)
+        Format: 3 hex chars — each nibble doubled (f→ff, 8→88, 0→00).
+
+        MeshChat parity:
+          - Always consume the next 3 chars after F/B (if available),
+            regardless of whether they're valid hex. This matches NomadNet's
+            MicronParser and Liam Cottle's MicronParser.js, both of which
+            do `line.substr(i+1,3)` + `skip = 3` unconditionally.
+          - If the 3 chars aren't valid hex, no colour is applied (the
+            colour-state holds the invalid string; rendering ignores it),
+            but the 3 chars are still consumed so they don't leak as text.
+          - The 24-bit `T<6hex>` extension that Micron2HTML used to accept
+            has been dropped — neither MeshChat nor NomadNet support it.
 
         Returns (css_color_str | None, new_index).
         """
-        if i >= n:
-            return None, i
-        if text[i] == "T":
-            j = i + 1
-            if j + 6 <= n:
-                h6 = text[j:j + 6]
-                if all(c in _HEX for c in h6):
-                    return f"#{h6.lower()}", j + 6
-            return None, i
         if i + 3 <= n:
             h3 = text[i:i + 3]
             if all(c in _HEX for c in h3):
                 return "#" + "".join(c * 2 for c in h3).lower(), i + 3
+            # Invalid hex — still consume the 3 chars to match MeshChat,
+            # but signal "no colour" so the caller doesn't open a span.
+            return None, i + 3
         return None, i
 
     def _parse_header_color(self, value: str) -> Optional[str]:
@@ -504,100 +543,75 @@ class MicronConverter:
             return f"#{v.lower()}"
         return None
 
-    def _extract_line_bg_color(self, line: str) -> Optional[str]:
-        """Scan the start of a raw Micron line for a background-colour token.
-
-        Skips leading alignment / bold / italic / underline / fg-colour tokens.
-        Returns a CSS color string or None.  Used to apply the colour to the
-        wrapper <div> so it fills the full line width (terminal behaviour).
-        """
-        i, n = 0, len(line)
-        while i + 1 < n and line[i] == "`":
-            nc = line[i + 1]
-            if nc in ("c", "l", "r", "a", "!", "*", "_"):
-                i += 2
-            elif nc in ("F", "B"):
-                is_bg = (nc == "B")
-                i += 2
-                if i < n and line[i] == "T":
-                    j = i + 1
-                    hs = line[j:j + 6] if j + 6 <= n else ""
-                    if len(hs) == 6 and all(c in _HEX for c in hs):
-                        color = f"#{hs.lower()}"
-                        i = j + 6
-                    else:
-                        return None
-                else:
-                    hs = line[i:i + 3] if i + 3 <= n else ""
-                    if len(hs) == 3 and all(c in _HEX for c in hs):
-                        color = "#" + "".join(c * 2 for c in hs).lower()
-                        i += 3
-                    else:
-                        return None
-                if is_bg:
-                    return color
-                # foreground colour — skip and keep scanning
-            else:
-                break
-        return None
-
     def _resolve_url(self, url: str, node_hash: str, base_path: str) -> str:
         """Convert a Micron URL to an href via the configured resolver."""
         return self._url_resolver(url, node_hash, base_path)
 
-    def _render_field(self, inner: str, authenticated: bool = False) -> str:
+    def _render_field(self, field_content: str, field_data: str,
+                      authenticated: bool = False) -> str:
         """Render a Micron input field.
 
-        Formats
-          text/password : [size][!]|name`default   or   name`default
-          checkbox      : ?|field_name|value[|*]
-          radio         : ^|field_name|value[|*]
+        Mirrors `parseField()` in liamcottle/reticulum-meshchat MicronParser.js.
+
+        Formats (the `\\`` is the required separator between flags|name and
+        default/label):
+          text/password : `<[size][!]|name\\`default>`
+          checkbox      : `<?[size]|field_name|value[|*]\\`label>`
+          radio         : `<^[size]|field_name|value[|*]\\`label>`
+
+        `field_content` is everything between `<` and the backtick.
+        `field_data` is everything between the backtick and `>`.
         """
         dis = "" if authenticated else " disabled"
-        cls = ' class="mu-field"'
 
-        # Split on | to detect field type
-        pipe = inner.split("|")
-        flags_raw = pipe[0]
-        flags = "".join(c for c in flags_raw if not c.isdigit())
+        field_masked = False
+        field_width = 24
+        field_type = "field"
+        field_name = field_content
+        field_value = ""
+        field_prechecked = False
 
-        # ---- Checkbox  (`<?|name|value[|*]>) ----
-        if "?" in flags:
-            name  = html.escape(pipe[1].strip()) if len(pipe) > 1 else ""
-            value = html.escape(pipe[2].strip()) if len(pipe) > 2 else "on"
-            pre   = len(pipe) > 3 and pipe[3].strip() == "*"
-            chk   = " checked" if pre else ""
-            return f'<input type="checkbox" name="{name}" value="{value}"{dis}{chk}>'
+        if "|" in field_content:
+            f_components = field_content.split("|")
+            field_flags = f_components[0]
+            field_name = f_components[1] if len(f_components) > 1 else ""
 
-        # ---- Radio  (`<^|name|value[|*]>) ----
-        if "^" in flags:
-            name  = html.escape(pipe[1].strip()) if len(pipe) > 1 else ""
-            value = html.escape(pipe[2].strip()) if len(pipe) > 2 else ""
-            pre   = len(pipe) > 3 and pipe[3].strip() == "*"
-            chk   = " checked" if pre else ""
-            return f'<input type="radio" name="{name}" value="{value}"{dis}{chk}>'
+            if "^" in field_flags:
+                field_type = "radio"
+                field_flags = field_flags.replace("^", "")
+            elif "?" in field_flags:
+                field_type = "checkbox"
+                field_flags = field_flags.replace("?", "")
+            elif "!" in field_flags:
+                field_masked = True
+                field_flags = field_flags.replace("!", "")
 
-        # ---- Text / password ----
-        # Format: [size][!]|name`default  OR  name`default  (no pipe)
-        if "|" in inner:
-            size_flags = pipe[0]
-            rest = "|".join(pipe[1:])
-        else:
-            size_flags = ""
-            rest = inner
+            if field_flags:
+                try:
+                    w = int(field_flags)
+                    field_width = min(w, 256)
+                except ValueError:
+                    pass
 
-        tick = rest.split("`", 1)
-        name    = html.escape(tick[0]) if tick else ""
-        default = html.escape(tick[1]) if len(tick) > 1 else ""
+            if len(f_components) > 2:
+                field_value = f_components[2]
+            if len(f_components) > 3 and f_components[3] == "*":
+                field_prechecked = True
 
-        size_digits = "".join(c for c in size_flags if c.isdigit())
-        is_pass     = "!" in size_flags
+        name_attr = html.escape(field_name)
+        if field_type in ("checkbox", "radio"):
+            value = field_value or field_data
+            label = field_data
+            chk = " checked" if field_prechecked else ""
+            return (f'<input type="{field_type}" name="{name_attr}" '
+                    f'value="{html.escape(value)}"{dis}{chk}> '
+                    f'{html.escape(label)}')
 
-        size_attr  = f' size="{size_digits}"' if size_digits else ""
-        itype      = "password" if is_pass else "text"
-
-        return (f'<input type="{itype}" name="{name}" value="{default}"'
-                f'{size_attr}{dis}{cls}>')
+        # Text / password
+        itype = "password" if field_masked else "text"
+        return (f'<input type="{itype}" name="{name_attr}" '
+                f'value="{html.escape(field_data)}" '
+                f'size="{field_width}"{dis} class="mu-field">')
 
     def _pop_tag(self, state: _InlineState, tag_type: str) -> None:
         for j in range(len(state.tag_stack) - 1, -1, -1):

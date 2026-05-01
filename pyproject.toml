@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Micron2HTML"
-version = "1.0.0"
+version = "1.0.2"
 description = "Convert Micron markup (NomadNet) to HTML"
 readme = "README.md"
 license = { text = "MIT" }
@@ -43,4 +43,4 @@ packages = ["micron2html"]
 package-dir = {"micron2html" = "."}
 
 [tool.setuptools.package-data]
-micron2html = ["micron.css"]
+micron2html = ["micron.css", "RobotoMonoNerdFont-Regular.ttf"]
