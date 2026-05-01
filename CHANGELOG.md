@@ -3,6 +3,12 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.3]
+
+### Fixed
+
+- **Multi-field link specs no longer drop fields after the first.** `[label`URL`a=1`b=2]` previously took only `parts[2]` as the field spec, silently discarding `b=2`. The renderer now joins all backtick-separated field specs into `data-field-spec`, matching MeshChat's behaviour. Single-field links (the common case) are unchanged.
+
 ## [1.0.2]
 
 ### Changed — MeshChat parity pass

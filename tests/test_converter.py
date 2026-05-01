@@ -259,6 +259,23 @@ class TestLinks:
         out = conv.convert("`[Web`https://example.com]")
         assert 'href="https://example.com"' in out
 
+    def test_link_single_field_spec(self, conv):
+        out = conv.convert(
+            "`[Register`:/page/index.mu`action=register]",
+            node_hash="deadbeef",
+        )
+        assert 'data-field-spec="action=register"' in out
+
+    def test_link_multi_field_spec_preserves_all(self, conv):
+        # Regression: earlier versions only captured parts[2] and dropped
+        # every field after the first. The full backtick-separated spec
+        # must be preserved so the renderer can forward each key=value.
+        out = conv.convert(
+            "`[Go`:/page/x.mu`a=1`b=2`c=3]",
+            node_hash="deadbeef",
+        )
+        assert 'data-field-spec="a=1`b=2`c=3"' in out
+
 
 # ---------------------------------------------------------------------------
 # Literal mode

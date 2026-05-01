@@ -427,7 +427,7 @@ class MicronConverter:
                     state.literal = True
                     i += 1
 
-                # Link  (`[label`URL`fieldspec] or `[URL])
+                # Link  (`[label`URL`field1=v1`field2=v2…] or `[URL])
                 elif nc == "[":
                     i += 1  # past [
                     end = text.find("]", i)
@@ -436,7 +436,10 @@ class MicronConverter:
                         parts = link_inner.split("`")
                         if len(parts) >= 2:
                             lbl, url = parts[0], parts[1]
-                            fspec = parts[2] if len(parts) > 2 else ""
+                            # Preserve all backtick-separated field specs.
+                            # Earlier versions only took parts[2], silently
+                            # dropping every field after the first.
+                            fspec = "`".join(parts[2:]) if len(parts) > 2 else ""
                         else:
                             url = parts[0]
                             lbl = ""
