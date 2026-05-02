@@ -43,4 +43,4 @@ packages = ["micron2html"]
 package-dir = {"micron2html" = "."}
 
 [tool.setuptools.package-data]
-micron2html = ["micron.css", "RobotoMonoNerdFont-Regular.ttf"]
+micron2html = ["micron-meshchat.css", "RobotoMonoNerdFont-Regular.ttf"]

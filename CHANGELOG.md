@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), and this pro
 
 ## [1.0.3]
 
+### Changed (breaking)
+
+- **Bundled stylesheet renamed from `micron.css` to `micron-meshchat.css`** to make the MeshChat-parity intent explicit. If you previously linked the file by name in your HTML or copied it during your build, update the path.
+
 ### Fixed
 
 - **Multi-field link specs no longer drop fields after the first.** `[label`URL`a=1`b=2]` previously took only `parts[2]` as the field spec, silently discarding `b=2`. The renderer now joins all backtick-separated field specs into `data-field-spec`, matching MeshChat's behaviour. Single-field links (the common case) are unchanged.

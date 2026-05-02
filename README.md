@@ -63,13 +63,13 @@ conv = MicronConverter(url_resolver=my_resolver)
 
 ### Default stylesheet
 
-A reference stylesheet matching NomadNet's terminal aesthetic ships with the package:
+A MeshChat-parity stylesheet ships with the package, named to make the design intent explicit:
 
 ```html
-<link rel="stylesheet" href="/static/micron.css">
+<link rel="stylesheet" href="/static/micron-meshchat.css">
 ```
 
-The file lives at `micron2html/micron.css` in the installed package — copy it into your static directory, or import it via your build pipeline. All rules are scoped to `.mu-*` classes so they won't bleed into the rest of your page.
+The file lives at `micron2html/micron-meshchat.css` in the installed package — copy it into your static directory, or import it via your build pipeline. All rules are scoped to `.mu-*` classes so they won't bleed into the rest of your page.
 
 ## CLI usage
 
