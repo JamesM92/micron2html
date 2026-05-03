@@ -1,4 +1,4 @@
-/* Micron2HTML — default stylesheet (v1.0.2)
+/* Micron2HTML — default stylesheet (v1.0.4)
  *
  * Drop this in alongside the converter's HTML output for instant rendering
  * that matches Reticulum MeshChat's NomadNet renderer. All rules are scoped
@@ -7,6 +7,12 @@
  * Pairs with the bundled `RobotoMonoNerdFont-Regular.ttf` (CC BY 4.0, by
  * Christian Robertson + Nerd Fonts contributors) — drop both files in the
  * same directory and the @font-face below picks it up automatically.
+ *
+ * The Braille block (U+2800-28FF) is carved out of Roboto Mono and routed
+ * to a system-font fallback chain — Roboto Mono's Braille glyphs don't
+ * reach the cell edges, so a row of full-dot Braille reads as gappy dots
+ * instead of a contiguous grid (MeshChat-parity bug, fixed here so every
+ * downstream consumer gets the right rendering for free).
  */
 
 @font-face {
@@ -15,6 +21,25 @@
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-27FF, U+2900-FFFF, U+10000-10FFFF;
+}
+
+/* Braille — system font fallback. None of these are bundled; the browser
+ * uses whichever the user's OS ships (Linux usually has Noto or DejaVu,
+ * macOS has Apple Symbols, Windows has Segoe UI Symbol). If none are
+ * installed, the browser falls back to its generic monospace default and
+ * the gap returns — but that's strictly better than always-gappy, and
+ * adds zero KB to the page weight. */
+@font-face {
+  font-family: 'Roboto Mono Nerd Font';
+  src: local('Noto Sans Mono'),
+       local('DejaVu Sans Mono'),
+       local('Symbola'),
+       local('Apple Symbols'),
+       local('Segoe UI Symbol');
+  font-weight: 400;
+  font-style: normal;
+  unicode-range: U+2800-28FF;
 }
 
 /* ---- Page wrapper -----------------------------------------------------

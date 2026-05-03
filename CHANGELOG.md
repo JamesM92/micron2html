@@ -3,6 +3,12 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.4]
+
+### Fixed
+
+- **Braille (U+2800-28FF) now renders without gaps between cells.** Roboto Mono Nerd Font's Braille glyphs don't reach the cell edges, so a row of full-dot Braille displayed as gappy dots instead of a contiguous grid — visible mismatch with MeshChat, which routes Braille through a system font that fills the cell. The bundled `micron-meshchat.css` now carves U+2800-28FF out of the Roboto Mono `@font-face` via `unicode-range` and adds a second `@font-face` fallback chain (Noto Sans Mono → DejaVu Sans Mono → Symbola → Apple Symbols → Segoe UI Symbol). Pure-CSS, no font bundled, zero added bytes — and if none of the fallbacks are installed the browser drops to its generic monospace, which is no worse than before.
+
 ## [1.0.3]
 
 ### Changed (breaking)
