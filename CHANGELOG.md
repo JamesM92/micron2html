@@ -3,6 +3,32 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.5]
+
+### Changed
+
+- **Braille (U+2800–U+28FF) is now CSS-drawn instead of font-rendered.**
+  v1.0.4 routed the Braille block through a system-font fallback chain,
+  but Roboto Mono Nerd Font has no Braille glyphs at all and the chosen
+  fallbacks (Noto Sans Mono, DejaVu Sans Mono, Noto Sans Symbols 2)
+  render Braille narrower than the monospace cell — adjacent cells
+  leave visible gaps and a row of full-dot Braille reads as separated
+  dots instead of a contiguous grid. The converter now replaces every
+  Braille character with `<span class="mu-braille" style="--mu-braille-dots:…">`,
+  with the raised dots encoded as a list of `radial-gradient`s. The
+  bundled `micron-meshchat.css` ships the matching `.mu-braille` rule
+  (1ch-wide inline-block + ::before painting the gradients). Result:
+  paired dots within a cell read as paired, rows of identical cells
+  flow as a continuous strip, and rendering is fully font-independent.
+  License + bundle size unchanged (font-bundling alternatives explored
+  in v1.0.4 were dropped).
+
+  Public-API addition: `MicronConverter.convert()` and `convert_inline()`
+  gain a `render_braille: bool = True` parameter — pass `False` to keep
+  the raw Braille codepoints (e.g. when feeding the result through a
+  pipeline that strips HTML tags). `to_text()` does this internally so
+  Braille survives the strip.
+
 ## [1.0.4]
 
 ### Fixed

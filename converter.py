@@ -18,6 +18,59 @@ _TAG_RE = re.compile(r'<[^>]+>')
 
 _HEX = frozenset("0123456789abcdefABCDEF")
 
+# ---------------------------------------------------------------------------
+# Braille rendering
+#
+# The bundled Roboto Mono Nerd Font has no Braille glyphs at all, and the
+# system-monospace fallbacks on most platforms render Braille at much less
+# than full cell width — adjacent cells leave visible gaps and a row of
+# full-dot Braille reads as separated dots instead of a contiguous grid.
+#
+# We post-process the converted HTML to replace each Braille character
+# (U+2800–U+28FF) with a `<span class="mu-braille">` whose dots are
+# painted by CSS via `--mu-braille-dots` (a list of `radial-gradient`s,
+# one per raised dot). The result is font-independent: the cells always
+# render at exactly `1ch` wide with the dots at fixed fractional positions.
+#
+# The bundled `micron-meshchat.css` ships the matching `.mu-braille` rule.
+# ---------------------------------------------------------------------------
+
+_BRAILLE_DOT_POSITIONS = (
+    # (left%, top%) for each bit, in order: dot1 dot2 dot3 dot4 dot5 dot6 dot7 dot8
+    # 8-dot Braille fits in a 2×4 grid; spacing tuned so paired dots within
+    # a cell read as paired and rows of identical glyphs flow as a strip.
+    (25, 15), (25, 38), (25, 62),
+    (75, 15), (75, 38), (75, 62),
+    (25, 85), (75, 85),
+)
+
+_BRAILLE_RE = re.compile(r"<[^>]*>|[⠀-⣿]")
+
+
+def _braillify_html(html_str: str) -> str:
+    """Replace Braille codepoints in HTML text with CSS-drawn span elements.
+
+    Tags and attribute values are matched first (greedy alternation) and
+    pass through untouched, so nothing inside ``<a href="…">`` or
+    ``data-…`` attributes gets rewritten.
+    """
+    def repl(m: "re.Match[str]") -> str:
+        s = m.group(0)
+        if s.startswith("<"):
+            return s
+        bits = ord(s) - 0x2800
+        grads = []
+        for i in range(8):
+            if bits & (1 << i):
+                x, y = _BRAILLE_DOT_POSITIONS[i]
+                grads.append(
+                    f"radial-gradient(circle at {x}% {y}%, "
+                    f"currentColor 0.07em, transparent 0.08em)"
+                )
+        style = f' style="--mu-braille-dots:{",".join(grads)}"' if grads else ""
+        return f'<span class="mu-braille"{style}></span>'
+    return _BRAILLE_RE.sub(repl, html_str)
+
 # Type alias for a URL resolver: (raw_url, node_hash, base_path) -> href
 UrlResolver = Callable[[str, str, str], str]
 
@@ -118,7 +171,7 @@ class MicronConverter:
         self._url_resolver: UrlResolver = url_resolver or default_url_resolver
 
     def convert(self, text: str, node_hash: str = "", base_path: str = "",
-                authenticated: bool = False) -> str:
+                authenticated: bool = False, render_braille: bool = True) -> str:
         """Convert a full Micron document to an HTML fragment.
 
         Parameters
@@ -135,6 +188,13 @@ class MicronConverter:
             When ``True``, form fields are rendered as editable ``<input>``
             elements. When ``False`` (default), they are rendered as
             disabled inputs so guests can see them but not submit.
+        render_braille
+            When ``True`` (default), Braille characters (U+2800–U+28FF) in
+            the output are replaced with ``<span class="mu-braille">``
+            elements that render the dots via CSS — see the comment above
+            ``_braillify_html`` for rationale. Pass ``False`` to keep the
+            raw Braille codepoints (e.g. when feeding the result to a
+            downstream consumer that strips tags).
         """
         lines = text.split("\n")
         doc = _DocState()
@@ -159,11 +219,13 @@ class MicronConverter:
         if doc.doc_fg:
             styles.append(f"color:{doc.doc_fg}")
         if styles:
-            return f'<div class="mu-page" style="{";".join(styles)}">{body}</div>'
-        return body
+            result = f'<div class="mu-page" style="{";".join(styles)}">{body}</div>'
+        else:
+            result = body
+        return _braillify_html(result) if render_braille else result
 
     def convert_inline(self, text: str, node_hash: str = "", base_path: str = "",
-                       authenticated: bool = False) -> str:
+                       authenticated: bool = False, render_braille: bool = True) -> str:
         """Convert a single line of Micron markup to inline HTML.
 
         Returns formatted HTML *without* the ``<div class="mu-line">`` wrapper —
@@ -171,9 +233,13 @@ class MicronConverter:
         anywhere you need just the inline formatting (colors, bold, links).
 
         Multi-line input has all newlines replaced with spaces.
+
+        ``render_braille`` controls the Braille post-processing — see
+        :meth:`convert` for details.
         """
         single = text.replace("\n", " ").strip()
-        return self._parse_inline(single, node_hash, base_path, authenticated, _DocState())
+        result = self._parse_inline(single, node_hash, base_path, authenticated, _DocState())
+        return _braillify_html(result) if render_braille else result
 
     def to_text(self, text: str) -> str:
         """Render Micron markup to plain text, stripping formatting and colors.
@@ -183,7 +249,7 @@ class MicronConverter:
         Links retain only their label text; URLs are dropped. Literal blocks
         appear as their raw content. Page-level fg/bg headers are dropped.
         """
-        html_out = self.convert(text)
+        html_out = self.convert(text, render_braille=False)
         plain = _TAG_RE.sub("", html_out)
         return html.unescape(plain).strip()
 

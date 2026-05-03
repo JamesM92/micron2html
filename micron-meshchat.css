@@ -149,6 +149,29 @@
     141ch 0, 142ch 0, 143ch 0, 144ch 0, 145ch 0, 146ch 0, 147ch 0, 148ch 0, 149ch 0, 150ch 0;
 }
 
+/* ---- Braille (CSS-drawn dots) ---------------------------------------
+ * The converter replaces every Braille character (U+2800–U+28FF) with
+ * a `<span class="mu-braille">` whose `--mu-braille-dots` custom
+ * property holds a list of `radial-gradient`s, one per raised dot.
+ * Roboto Mono Nerd Font has no Braille glyphs, and most system-monospace
+ * fallbacks render Braille narrower than the cell — drawing the dots
+ * ourselves keeps every cell at exactly `1ch` and lets a row of full-dot
+ * Braille flow as a contiguous grid. */
+.mu-braille {
+  display: inline-block;
+  width: 1ch;
+  height: 1em;
+  vertical-align: baseline;
+  position: relative;
+}
+.mu-braille::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--mu-braille-dots, transparent);
+  background-repeat: no-repeat;
+}
+
 /* ---- Bold (fake-bold via text-shadow) -------------------------------
  * We only ship the Regular weight, so synthesised bold would shift glyph
  * widths and break monospace alignment. Drawing the glyph 0.5px to the
