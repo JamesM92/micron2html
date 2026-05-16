@@ -36,12 +36,16 @@ _HEX = frozenset("0123456789abcdefABCDEF")
 # ---------------------------------------------------------------------------
 
 _BRAILLE_DOT_POSITIONS = (
-    # (left%, top%) for each bit, in order: dot1 dot2 dot3 dot4 dot5 dot6 dot7 dot8
-    # 8-dot Braille fits in a 2×4 grid; spacing tuned so paired dots within
-    # a cell read as paired and rows of identical glyphs flow as a strip.
-    (25, 15), (25, 38), (25, 62),
-    (75, 15), (75, 38), (75, 62),
-    (25, 85), (75, 85),
+    # (left%, top%) for each bit, in order: dot1 dot2 dot3 dot4 dot5 dot6 dot7 dot8.
+    # 8-dot Braille fits in a 2×4 grid. Vertical positions at 1/8 intervals
+    # (12.5/37.5/62.5/87.5) so intra-cell row spacing = inter-cell row spacing
+    # = 25%. With uniform spacing, a column of full-dot Braille cells reads
+    # as a single continuous grid; the previous tuning (15/38/62/85) had a
+    # disproportionately wider inter-cell gap (~30% vs ~24% intra) that
+    # showed up as a visible horizontal stripe between rows.
+    (25, 12.5), (25, 37.5), (25, 62.5),
+    (75, 12.5), (75, 37.5), (75, 62.5),
+    (25, 87.5), (75, 87.5),
 )
 
 _BRAILLE_RE = re.compile(r"<[^>]*>|[⠀-⣿]")
