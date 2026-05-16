@@ -37,15 +37,15 @@ _HEX = frozenset("0123456789abcdefABCDEF")
 
 _BRAILLE_DOT_POSITIONS = (
     # (left%, top%) for each bit, in order: dot1 dot2 dot3 dot4 dot5 dot6 dot7 dot8.
-    # 8-dot Braille fits in a 2×4 grid. Vertical positions pinned at the cell
-    # edges (0 / 33.33 / 66.67 / 100) so the top and bottom dots straddle the
-    # cell boundary — only the bottom half of the top dot and the top half of
-    # the bottom dot are painted within the cell, and when adjacent cells
-    # stack vertically the two halves from neighbouring cells combine into a
-    # single full dot at the boundary. Eliminates the inter-cell gap entirely.
-    (25, 0),     (25, 33.33), (25, 66.67),
-    (75, 0),     (75, 33.33), (75, 66.67),
-    (25, 100),   (75, 100),
+    # 8-dot Braille fits in a 2×4 grid. Vertical positions pushed close to
+    # cell edges (5/35/65/95) so the inter-cell gap (between cell N's bottom
+    # dot at y=95% and cell N+1's top dot at y=5%) is small — 10% of cell
+    # height vs 30% intra-cell — making adjacent rows of Braille flow with
+    # tightly stacked dots instead of separating into discrete rows by a
+    # visible horizontal stripe.
+    (25, 5), (25, 35), (25, 65),
+    (75, 5), (75, 35), (75, 65),
+    (25, 95), (75, 95),
 )
 
 _BRAILLE_RE = re.compile(r"<[^>]*>|[⠀-⣿]")
