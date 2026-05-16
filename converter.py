@@ -69,7 +69,7 @@ def _braillify_html(html_str: str) -> str:
                 x, y = _BRAILLE_DOT_POSITIONS[i]
                 grads.append(
                     f"radial-gradient(circle at {x}% {y}%, "
-                    f"currentColor 0.07em, transparent 0.08em)"
+                    f"currentColor 0.125em, transparent 0.135em)"
                 )
         style = f' style="--mu-braille-dots:{",".join(grads)}"' if grads else ""
         return f'<span class="mu-braille"{style}></span>'
