@@ -37,15 +37,15 @@ _HEX = frozenset("0123456789abcdefABCDEF")
 
 _BRAILLE_DOT_POSITIONS = (
     # (left%, top%) for each bit, in order: dot1 dot2 dot3 dot4 dot5 dot6 dot7 dot8.
-    # 8-dot Braille fits in a 2×4 grid. Vertical positions at 1/8 intervals
-    # (12.5/37.5/62.5/87.5) so intra-cell row spacing = inter-cell row spacing
-    # = 25%. With uniform spacing, a column of full-dot Braille cells reads
-    # as a single continuous grid; the previous tuning (15/38/62/85) had a
-    # disproportionately wider inter-cell gap (~30% vs ~24% intra) that
-    # showed up as a visible horizontal stripe between rows.
-    (25, 12.5), (25, 37.5), (25, 62.5),
-    (75, 12.5), (75, 37.5), (75, 62.5),
-    (25, 87.5), (75, 87.5),
+    # 8-dot Braille fits in a 2×4 grid. Vertical positions pushed close to
+    # cell edges (5/35/65/95) so the inter-cell gap (between cell N's bottom
+    # dot at y=95% and cell N+1's top dot at y=5%) is small — 10% of cell
+    # height vs 30% intra-cell — making adjacent rows of Braille flow with
+    # tightly stacked dots instead of separating into discrete rows by a
+    # visible horizontal stripe.
+    (25, 5), (25, 35), (25, 65),
+    (75, 5), (75, 35), (75, 65),
+    (25, 95), (75, 95),
 )
 
 _BRAILLE_RE = re.compile(r"<[^>]*>|[⠀-⣿]")
@@ -69,7 +69,7 @@ def _braillify_html(html_str: str) -> str:
                 x, y = _BRAILLE_DOT_POSITIONS[i]
                 grads.append(
                     f"radial-gradient(circle at {x}% {y}%, "
-                    f"currentColor 0.125em, transparent 0.135em)"
+                    f"currentColor 0.07em, transparent 0.08em)"
                 )
         style = f' style="--mu-braille-dots:{",".join(grads)}"' if grads else ""
         return f'<span class="mu-braille"{style}></span>'
