@@ -3,6 +3,16 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.7]
+
+### Infrastructure
+
+- Added GitHub Actions CI: pytest matrix across Python 3.9–3.12, sdist + wheel build, and `twine check`.
+- Added security workflow: `pip-audit` for dependency CVEs, GitHub `dependency-review` on PRs, and CodeQL static analysis with `security-and-quality` queries, plus a weekly scheduled run to catch newly-disclosed vulnerabilities.
+- Added PyPI publish workflow using Trusted Publishing (OIDC) — releases are built and uploaded automatically on GitHub Release publication, with no long-lived API tokens stored in the repo.
+
+No functional code changes since 1.0.6.
+
 ## [1.0.5]
 
 ### Changed
