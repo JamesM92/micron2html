@@ -1,0 +1,17 @@
+version: 2
+
+# Monthly cadence — matches NomadPortal's schedule. Dependabot's role
+# here is incrementing through routine upstream releases (pytest dev
+# dep, action versions); the .github/workflows/security.yml job is
+# what catches CVEs on every PR/push.
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
