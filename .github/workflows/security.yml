@@ -24,10 +24,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install project (with dev deps)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
       - name: Run pip-audit
         uses: pypa/gh-action-pip-audit@v1.1.0
-        with:
-          inputs: pyproject.toml
 
   dependency-review:
     name: Dependency review (PR only)
