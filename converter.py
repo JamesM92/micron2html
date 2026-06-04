@@ -666,15 +666,8 @@ class MicronConverter:
                 field_masked = True
                 field_flags = field_flags.replace("!", "")
 
-            if field_flags:
-                try:
-                    w = int(field_flags)
-                    field_width = min(w, 256)
-                except ValueError:
-                    # Non-numeric leftover after stripping known flags — Micron
-                    # is lenient about field specs, so fall back to default width
-                    # rather than failing the whole document.
-                    pass
+            if field_flags and field_flags.isdigit():
+                field_width = min(int(field_flags), 256)
 
             if len(f_components) > 2:
                 field_value = f_components[2]
