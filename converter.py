@@ -671,6 +671,9 @@ class MicronConverter:
                     w = int(field_flags)
                     field_width = min(w, 256)
                 except ValueError:
+                    # Non-numeric leftover after stripping known flags — Micron
+                    # is lenient about field specs, so fall back to default width
+                    # rather than failing the whole document.
                     pass
 
             if len(f_components) > 2:
