@@ -5,10 +5,33 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), and this pro
 
 ## [Unreleased]
 
+### Changed — goal correction: MeshChat parity → NomadNet parity
+
+The project's stated design goal was "MeshChat parity" (matching [Reticulum MeshChat](https://github.com/liamcottle/reticulum-meshchat)'s `MicronParser.js`). That target was corrected to NomadNet parity — rendering Micron the way the real [NomadNet](https://github.com/markqvist/NomadNet) client would, per its own [Guide.py](https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/Guide.py) (the in-app spec for page authors) and [MicronParser.py](https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/MicronParser.py) (the reference implementation), which were fetched and read line-by-line for this pass. Most of what was previously justified as "MeshChat parity" turned out to already match NomadNet's own behavior too (unknown-token consumption, the field backtick requirement, heading depth limits, no line-level `B` fill) — those comments were relabeled without any behavior change. Where the two genuinely disagreed:
+
+- **Divider parsing now matches NomadNet's exact-length-2 rule.** NomadNet only honours a custom divider character when the line is exactly `-` + one more character; anything else (`---`, `-==`, …) falls back to the default rule regardless of content. Previously any line starting with `-` used its second character as the repeat char / "double rule" trigger, so e.g. `---` incorrectly rendered as a `-`-repeat divider and `-==` incorrectly got the "double rule" `<hr>` styling.
+- **Page-level `#!bg=`/`#!fg=` headers were double-checked against Guide.py and confirmed to correctly accept both 3-hex and 6-hex** — unlike the inline `` `Fxxx ``/`` `Bxxx `` tokens, which the Guide explicitly restricts to 3 hex characters. (A same-session change had briefly tightened headers to 3-hex-only before this recheck; that's reverted here.)
+- **The inline `` `FT<6hex> `` 24-bit colour stays unsupported, now for an accurate reason.** NomadNet's reference parser does implement it, but its own Guide never teaches it to page authors and MeshChat doesn't implement it either — so real-world `.mu` content won't rely on it. The old justification ("neither MeshChat nor NomadNet support it") was simply wrong about NomadNet's code; the comment now says why we still don't chase it.
+- **"Dynamic include" is renamed "Partials"** (NomadNet's own term) and documented honestly: NomadNet partials asynchronously load and can auto-refresh a page fragment with request fields and a `pid` target; this converter has no way to do that in a one-shot conversion, so it renders a static link to the URL only, and the `refresh`/`fields`/`pid` components are now documented as discarded rather than implied to be used.
+- **Link field-specs' primary documented syntax is now pipe-separated** (`` `[label`url`a=1|b=2] ``), matching NomadNet's actual syntax — the previous docs modeled it on backtick-separated segments (`` `[label`url`a=1`b=2] ``), which is a MeshChat/Micron2HTML leniency real NomadNet doesn't share (it renders nothing for a link with more than 3 backtick-separated components). The lenient behavior is unchanged, just no longer presented as the primary form.
+- **Checkbox/radio field docs now also show NomadNet's own canonical style** (empty field label, visible text written after the `>`) alongside the embedded-label form already documented.
+- Added a **Known limitations** section to the README: tables, anchors, and the partials simplification are undocumented-until-now gaps; alignment-anywhere and inline literal-toggle are documented as intentional supersets of NomadNet's line-scoped versions, not bugs.
+
+See [README.md](README.md) for the full corrected syntax reference.
+
 ### Fixed
 
-- **Page-level `#!bg=`/`#!fg=` headers now reject 6-hex values.** `_parse_header_color()` previously accepted both 3-hex (`#!bg=2a2`) and 6-hex (`#!bg=112233`) forms. Only the inline `` `Fxxx ``/`` `Bxxx `` tokens were ever restricted to 3-hex; the page-header path was an inconsistent leftover. Both colour paths now use the same 3-hex-shorthand format exclusively (each nibble doubled).
+- **README form-field docs described broken checkbox/radio syntax.** `` `<?|name|value> `` and `` `<^|name|value> `` (no backtick before the closing `>`) look plausible but don't actually render as `<input>` elements — NomadNet's own field parser requires the backtick + label, e.g. `` `<?|name|value`label> ``. [examples/showcase.mu](examples/showcase.mu) had the same broken form. Both corrected; the mandatory-backtick rule is now called out explicitly.
+- **README security section mischaracterized the file-link block.** Said `file://` scheme links are blocked; the code actually blocks any resolved URL containing a `/file/` path segment (NomadNet's download-file convention) — an actual `file://` URL isn't specially handled. Wording corrected, and the default `hash://`-vs-custom-resolver distinction is now spelled out.
+- **README said "pure Python 3.9+".** `pyproject.toml` has required `>=3.10` since v1.0.8; README now matches.
 - **Removed stale docs for the dropped `` `FTxxxxxx ``/`` `BTxxxxxx `` inline format.** The 24-bit inline extension was removed from the parser in v1.0.2, but [README.md](README.md) and [examples/showcase.mu](examples/showcase.mu) still described/demonstrated it. Docs and the example page now only show the supported 3-hex shorthand.
+- **README's `` `Fxxx `` doubling example was missing the command letter.** Showed `F40 → #ff4400` (2 hex digits after a bare `F`, which doesn't match the actual 3-hex format); corrected to `` `FF40 → #ff4400 ``.
+
+### Added
+
+- **README documents `to_text()` and `--format text`.** Both existed and were tested but were never mentioned in the library/CLI usage sections.
+- **README documents the partials token** (`` `{URL`refresh`fields} ``), previously present in the parser with no docs and no test coverage. Added 4 tests covering the happy path, missing refresh arg, discarded fields/pid, and unclosed-brace fallback.
+- Divider length-2 rule: 2 new tests locking in the corrected `---`/`-==` fallback behavior.
 
 ### Infrastructure
 

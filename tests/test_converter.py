@@ -43,7 +43,7 @@ class TestHeadings:
         assert 'class="mu-h3"' in out
 
     def test_heading_level_4_falls_back_to_mu_line(self, conv):
-        # MeshChat parity: only heading1/2/3 styles exist; deeper levels
+        # NomadNet: only heading1/2/3 styles exist; deeper levels
         # fall back to "plain" rendering (no bg block).
         out = conv.convert(">>>> Level 4")
         assert 'mu-line' in out
@@ -56,8 +56,9 @@ class TestHeadings:
         assert "<strong>" in out
 
     def test_empty_heading_emits_blank_line(self, conv):
-        # MeshChat parity: empty heading produces a blank row (its parseLine
-        # returns null and the outer loop appends a <br>).
+        # Deliberate deviation from NomadNet: its parse_line() returns None
+        # for an empty heading (no row at all). We render a blank row
+        # instead — collapsing the line entirely reads as a bug in HTML.
         out = conv.convert(">")
         assert 'mu-blank' in out
 
@@ -80,8 +81,26 @@ class TestDividers:
         out = conv.convert("-=")
         assert "mu-hr-double" in out
 
+    def test_triple_dash_falls_back_to_default_rule(self, conv):
+        # NomadNet only honours a custom divider character when the line is
+        # exactly "-" + one more character (MicronParser.py's parse_line:
+        # `if len(line) == 2`). "---" is length 3, so it falls back to the
+        # default rule rather than being treated as a "-"-repeat divider.
+        out = conv.convert("---")
+        assert "mu-divider" not in out
+        assert "mu-hr-double" not in out
+        assert "<hr" in out
+
+    def test_triple_char_equals_falls_back_to_default_rule(self, conv):
+        # Same length rule applies to the `-=` "double rule" special case —
+        # "-==" is length 3, so it does NOT get the mu-hr-double treatment.
+        out = conv.convert("-==")
+        assert "mu-hr-double" not in out
+        assert "mu-divider" not in out
+        assert "<hr" in out
+
     def test_equals_dash_is_text_not_divider(self, conv):
-        # MeshChat parity: only lines starting with `-` produce dividers.
+        # NomadNet: only lines starting with `-` produce dividers.
         # `=-` falls through and renders as regular text.
         out = conv.convert("=-")
         assert "<hr" not in out
@@ -130,10 +149,11 @@ class TestFormatting:
         assert "<strong>" not in out
 
     def test_unknown_token_eaten_silently(self, conv):
-        # MeshChat parity: backtick + unknown char are silently consumed
-        # (NomadNet's `default: break;` behaviour). The rendered text
-        # content should have "foo  bar" (with the `> consumed) and no
-        # leftover backtick or > glyph.
+        # NomadNet: an unrecognized char after a backtick falls through
+        # make_output()'s if/elif chain with no output — same outcome as
+        # MeshChat's `default: break;`. The rendered text content should
+        # have "foo  bar" (with the `> consumed) and no leftover backtick
+        # or > glyph.
         import re
         out = conv.convert("foo `> bar")
         # strip all HTML tags to get just the rendered text
@@ -158,17 +178,19 @@ class TestColors:
         assert "background-color:#333333" in out
 
     def test_invalid_hex_consumes_three_chars(self, conv):
-        # MeshChat parity: F/B always consume 3 chars after the prefix
-        # regardless of validity. Invalid hex applies no colour but still
-        # eats the 3 chars so they don't leak as text.
+        # NomadNet: F/B always consume 3 chars after the prefix regardless
+        # of validity. Invalid hex applies no colour but still eats the
+        # 3 chars so they don't leak as text.
         out = conv.convert("`Fxxx hello`f")
         assert "xxx" not in out
         assert "hello" in out
 
     def test_24bit_T_format_not_supported(self, conv):
-        # MeshChat doesn't support `FT<6hex>` 24-bit colour. v1.0.2 drops it
-        # for parity. The `T` plus 2 next chars are consumed as a (failed)
-        # 3-char hex, leaving the tail as visible text.
+        # NomadNet's own reference parser DOES accept `FT<6hex>`, but its
+        # Guide.py never teaches it and MeshChat doesn't implement it — we
+        # stay 3-hex-only to match what real page authors actually write.
+        # The `T` plus 2 next chars are consumed as a (failed) 3-char hex,
+        # leaving the tail as visible text.
         out = conv.convert("`FT8b4513 brown`f")
         assert "color:#8b4513" not in out
         assert "color:#" not in out  # no colour applied
@@ -179,16 +201,19 @@ class TestColors:
         assert "background-color:#333333" in out
         assert "color:#aaaaaa" in out
 
-    def test_header_fg_bg_6digit_not_supported(self, conv):
-        # Page-level headers use the same 3-hex shorthand as inline colours —
-        # 6-hex values are invalid and silently produce no colour.
+    def test_header_fg_bg_6digit(self, conv):
+        # Unlike the inline `Fxxx`/`Bxxx` tokens (3-hex-only by design),
+        # page-level #!bg=/#!fg= headers accept 6-hex too — NomadNet's
+        # Guide.py doesn't restrict the header value's length the way it
+        # restricts the inline colour tags.
         out = conv.convert("#!bg=112233\n#!fg=aabbcc\nhello")
-        assert "background-color" not in out
-        assert "color:#" not in out
+        assert "background-color:#112233" in out
+        assert "color:#aabbcc" in out
 
     def test_line_level_bg_not_applied_to_div(self, conv):
-        # MeshChat parity: a leading B token doesn't fill the entire line —
-        # only the explicit span gets the background.
+        # NomadNet: `B` only sets colour state used per text part as it's
+        # emitted — a leading B token doesn't fill the entire line, only
+        # the explicit span gets the background.
         out = conv.convert("`B400 red `b end")
         # the .mu-line wrapper itself should NOT carry background-color
         assert 'class="mu-line"' in out
@@ -290,6 +315,38 @@ class TestLinks:
 
 
 # ---------------------------------------------------------------------------
+# Partials
+# ---------------------------------------------------------------------------
+
+class TestPartials:
+    def test_partial_renders_live_link(self, conv):
+        out = conv.convert("`{hash:/abcdef/status.mu`5}")
+        assert "<a " in out
+        assert 'class="mu-dynamic"' in out
+        assert "[live]" in out
+        assert "hash://abcdef/status.mu" in out
+
+    def test_partial_without_refresh_arg(self, conv):
+        out = conv.convert("`{hash:/abcdef/status.mu}")
+        assert "hash://abcdef/status.mu" in out
+        assert "[live]" in out
+
+    def test_partial_fields_and_pid_are_discarded(self, conv):
+        # NomadNet's partial fields (pipe-separated, may include pid=) are
+        # only meaningful for the live async-refresh behavior this converter
+        # doesn't implement — only the URL survives into the rendered link.
+        out = conv.convert("`{hash:/abcdef/status.mu`10`action=view|pid=main}")
+        assert "hash://abcdef/status.mu" in out
+        assert "action=view" not in out
+        assert "pid=main" not in out
+
+    def test_partial_unclosed_renders_literal_brace(self, conv):
+        out = conv.convert("`{hash:/abcdef/status.mu")
+        assert "<a " not in out
+        assert "{" in out
+
+
+# ---------------------------------------------------------------------------
 # Literal mode
 # ---------------------------------------------------------------------------
 
@@ -317,7 +374,7 @@ class TestFormFields:
         assert 'value="alice"' in out
 
     def test_checkbox_with_label(self, conv):
-        # MeshChat parity: checkbox needs the backtick separator too:
+        # NomadNet: checkbox needs the backtick separator too:
         #   `<?|name|value|*`label>
         out = conv.convert("`<?|agree|yes|*`I agree>")
         assert 'type="checkbox"' in out
@@ -337,8 +394,9 @@ class TestFormFields:
         assert 'disabled' in out
 
     def test_field_without_backtick_separator_is_eaten(self, conv):
-        # MeshChat parity: missing backtick in field syntax causes the whole
-        # `< token to be silently consumed (parseField returns null).
+        # NomadNet: missing backtick in field syntax causes the whole
+        # `< token to be silently consumed (MicronParser.py's field
+        # handler gives up when `line.find('`', field_start)` is -1).
         out = conv.convert("`<?|agree|yes|*>")
         # The input opens with `< and never has a backtick before > —
         # parseField would return null, and the < is eaten.

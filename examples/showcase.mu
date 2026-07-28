@@ -71,8 +71,8 @@ URL only: `[`https://example.com]
 
   Username:    `<20|username`>
   Password:    `<20!|password`>
-  Subscribe:   `<?|subscribe|yes|*> Yes, sign me up
-  Plan:        `<^|plan|free|*> Free  `<^|plan|pro> Pro
+  Subscribe:   `<?|subscribe|yes|*`Yes, sign me up>
+  Plan:        `<^|plan|free|*`Free>  `<^|plan|pro`Pro>
 
 -=
 

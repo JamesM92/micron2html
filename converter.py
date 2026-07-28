@@ -1,8 +1,19 @@
 """
 Micron markup → HTML converter.
 
-Implements the full Micron specification as documented in:
-  https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/Guide.py
+Goal: NomadNet parity — render the same Micron source the way the real
+NomadNet client would, not just the way any one third-party client does.
+The reference sources are NomadNet's own:
+  - Guide.py (the in-app spec, written for page authors):
+    https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/Guide.py
+  - MicronParser.py (the reference implementation):
+    https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/MicronParser.py
+
+Where the two disagree (the parser accepts something the guide never
+teaches), this converter follows the guide — that's what real page authors
+actually write. Where NomadNet supports something this converter doesn't
+yet implement (tables, anchors, live-refreshing partials), that's called
+out at the relevant function rather than silently ignored.
 
 Default page colours match NomadNet's terminal defaults:
   background  #000000  (black)
@@ -277,9 +288,10 @@ class MicronConverter:
                 doc.literal = False
                 content = html.escape("\n".join(doc.literal_lines))
                 doc.literal_lines = []
-                # MeshChat parity: literal lines inherit the surrounding
-                # section depth's indent (its parser applies section indent
-                # to every line, literal or not).
+                # NomadNet: literal lines inherit the surrounding section
+                # depth's indent — MicronParser.py's parse_line() wraps
+                # every widget in Padding(left=left_indent(state), ...)
+                # whenever depth > 0, literal or not.
                 indent = max(0, doc.section - 1) * 20
                 style_attr = f' style="margin-left:{indent}px"' if indent else ''
                 return f'<pre class="mu-literal"{style_attr}>{content}</pre>'
@@ -320,9 +332,13 @@ class MicronConverter:
             doc.section = level
             heading_text = line[level:].strip()
             if not heading_text:
-                # MeshChat parity: empty heading line still emits a blank row
-                # (its parseLine returns null and the outer convertMicronToHtml
-                # loop appends a <br>). State (section depth) is updated above.
+                # Deliberate deviation from NomadNet here: its parse_line()
+                # returns None for an empty heading, so the reference client
+                # renders no row at all — not even blank space. We render a
+                # blank row instead (matching MeshChat's behaviour, which
+                # inserts a <br>) since collapsing the line entirely in an
+                # HTML document reads as a rendering bug rather than
+                # intentional spacing. Section depth is still updated above.
                 return '<div class="mu-blank"></div>'
             inner = self._parse_inline(heading_text, node_hash, base_path,
                                        authenticated, doc)
@@ -332,8 +348,9 @@ class MicronConverter:
             # while their bg still spans the full row.
             text_indent = (level - 1) * 20
             style_attr = f' style="padding-left:{text_indent}px"' if text_indent else ''
-            # MeshChat parity: only heading levels 1–3 have a bg block; level
-            # 4+ falls back to the "plain" style (no bg, default fg). We
+            # NomadNet: only heading levels 1-3 have a defined style
+            # (STYLES_DARK/STYLES_LIGHT in MicronParser.py only define
+            # heading1/2/3); level 4+ falls back to plain rendering. We
             # render levels >3 as `.mu-line` so they get plain rendering.
             if level == 1:
                 cls = "mu-h1"
@@ -346,30 +363,38 @@ class MicronConverter:
             return f'<div class="{cls}"{style_attr}>{inner}</div>'
 
         # ---- Dividers ----
-        # MeshChat parity: only lines starting with `-` produce dividers.
+        # NomadNet: only lines starting with `-` produce dividers.
         # `=-`, `==`, `===` etc. fall through and render as regular text.
         s = line.strip()
         if s and s[0] == "-":
             indent = max(0, doc.section - 1) * 20
             style_attr = f' style="margin-left:{indent}px"' if indent else ''
-            if len(s) == 1:
-                # `-` alone — thin solid rule (browser-default <hr>)
-                return f'<hr class="mu-hr"{style_attr}>'
-            if s[1] == "=":
-                # `-=` — row of `=` characters
-                return f'<hr class="mu-hr mu-hr-double"{style_attr}>'
-            # `--`, `-~`, `-*`, `-X`, etc. — styled divider; preserve the
-            # character so the renderer can repeat it across the row.
-            char_content = html.escape(s[1])
-            return f'<div class="mu-divider"{style_attr}>{char_content}</div>'
+            # NomadNet's parser only honours a custom divider character when
+            # the line is *exactly* "-" + one more character (see
+            # MicronParser.py's parse_line: `if len(line) == 2`). Any other
+            # length — a bare `-`, or `---`, `-==`, etc. — falls back to the
+            # default rule, regardless of what follows the first `-`.
+            if len(s) == 2:
+                if s[1] == "=":
+                    # `-=` — row of `=` characters
+                    return f'<hr class="mu-hr mu-hr-double"{style_attr}>'
+                # `-~`, `-*`, `-X`, etc. — styled divider; preserve the
+                # character so the renderer can repeat it across the row.
+                char_content = html.escape(s[1])
+                return f'<div class="mu-divider"{style_attr}>{char_content}</div>'
+            # `-` alone, or any other length (`--`, `---`, `-==`, …) —
+            # default thin solid rule (browser-default <hr>).
+            return f'<hr class="mu-hr"{style_attr}>'
 
         # ---- Empty line ----
         if not line.strip():
             return '<div class="mu-blank"></div>'
 
         # ---- Regular text line ----
-        # MeshChat parity: no line-level bg from a leading `B` token (its
-        # parser doesn't do that). Bg only applies inside the explicit span.
+        # NomadNet: `B` only sets the colour state used to style each text
+        # part as it's emitted (see make_style() in MicronParser.py) — there's
+        # no concept of a leading `B` token filling the whole row. Bg only
+        # applies inside the explicit span.
         inner = self._parse_inline(line, node_hash, base_path, authenticated, doc)
 
         style_parts = []
@@ -534,12 +559,14 @@ class MicronConverter:
                         out.append("[")
 
                 # Field  (`<flags|name`default>)
-                # MeshChat parity: a field requires a backtick between
-                # `<flags|name` and `default>`. Without it, MeshChat's
-                # parseField returns null and the `<` is silently eaten.
-                # We mirror that exactly so checkbox/radio shorthand that
-                # omits the backtick (`<?|name|value>`, `<^|name|value>`)
-                # produces the same broken render in both renderers.
+                # NomadNet: a field requires a backtick between `<flags|name`
+                # and `default>` — MicronParser.py's field handler does
+                # `backtick_pos = line.find('`', field_start)` and gives up
+                # entirely if it's not found (`pass  # No '`', invalid field`).
+                # We mirror that exactly, including for checkbox/radio
+                # shorthand that omits the backtick (`<?|name|value>`,
+                # `<^|name|value>`) — real NomadNet renders it as broken text
+                # too, not an input.
                 elif nc == "<":
                     field_start = i + 1
                     backtick_pos = text.find("`", field_start)
@@ -550,10 +577,19 @@ class MicronConverter:
                         out.append(self._render_field(field_content, field_data, authenticated))
                         i = end + 1
                     else:
-                        # Malformed — eat the `<` silently, matching MeshChat.
+                        # Malformed — eat the `<` silently, matching NomadNet.
                         i += 1
 
-                # Dynamic include  (`{URL`refresh})
+                # Partial  (`{URL`refresh`fields})
+                # NomadNet's partials asynchronously load and (optionally)
+                # periodically re-fetch a fragment of another page in place —
+                # see Guide.py's "Partials" section. That's not something a
+                # one-shot markup->HTML conversion can reproduce without
+                # adding JS, so this renders a plain clickable link to the
+                # target URL instead. The `refresh` and `fields` (pipe-
+                # separated, may include `pid=<id>`) components are
+                # discarded entirely — only the URL is used. See README
+                # for the full syntax NomadNet supports here.
                 elif nc == "{":
                     end = text.find("}", i + 1)
                     if end != -1:
@@ -592,16 +628,21 @@ class MicronConverter:
 
         Format: 3 hex chars — each nibble doubled (f→ff, 8→88, 0→00).
 
-        MeshChat parity:
+        NomadNet parity notes:
           - Always consume the next 3 chars after F/B (if available),
-            regardless of whether they're valid hex. This matches NomadNet's
-            MicronParser and Liam Cottle's MicronParser.js, both of which
-            do `line.substr(i+1,3)` + `skip = 3` unconditionally.
+            regardless of whether they're valid hex. Both MicronParser.py
+            (`line[i+1:i+4]` + `skip = 3`) and MeshChat's MicronParser.js
+            (`line.substr(i+1,3)` + `skip = 3`) do this unconditionally.
           - If the 3 chars aren't valid hex, no colour is applied (the
             colour-state holds the invalid string; rendering ignores it),
             but the 3 chars are still consumed so they don't leak as text.
-          - The 24-bit `T<6hex>` extension that Micron2HTML used to accept
-            has been dropped — neither MeshChat nor NomadNet support it.
+          - NomadNet's *reference parser* also accepts a `T<6hex>` 24-bit
+            form (`FTrrggbb`) — but its own Guide.py never teaches this to
+            page authors, and MeshChat doesn't implement it either. Since
+            the point of this converter is to render what real `.mu` pages
+            actually contain, not every corner of one client's source, we
+            deliberately stay 3-hex-only: any real-world page relying on
+            `FT<6hex>` wouldn't render correctly in MeshChat anyway.
 
         Returns (css_color_str | None, new_index).
         """
@@ -609,20 +650,28 @@ class MicronConverter:
             h3 = text[i:i + 3]
             if all(c in _HEX for c in h3):
                 return "#" + "".join(c * 2 for c in h3).lower(), i + 3
-            # Invalid hex — still consume the 3 chars to match MeshChat,
+            # Invalid hex — still consume the 3 chars to match NomadNet,
             # but signal "no colour" so the caller doesn't open a span.
             return None, i + 3
         return None, i
 
     def _parse_header_color(self, value: str) -> Optional[str]:
-        """Parse a #!fg=X or #!bg=X color value.  Returns CSS color or None.
+        """Parse a #!fg=X or #!bg=X page-header color value.
 
-        3-hex only, matching the inline `Fxxx`/`Bxxx` colour format —
-        each nibble is doubled (f -> ff, 8 -> 88, 0 -> 00).
+        Unlike the inline `Fxxx`/`Bxxx` tokens (deliberately 3-hex-only, see
+        `_parse_color`), Guide.py's "Page Foreground and Background Colors"
+        section states no length restriction for the header value — it just
+        gives a 3-hex example (`#!bg=444`). NomadNet's colour-rendering
+        helpers (`low_color`/`high_color` in MicronParser.py) generically
+        handle both 3-hex and 6-hex strings, so headers accept both here too.
+
+        Returns CSS color string or None.
         """
         v = value.strip()
         if len(v) == 3 and all(c in _HEX for c in v):
             return "#" + "".join(c * 2 for c in v).lower()
+        if len(v) == 6 and all(c in _HEX for c in v):
+            return f"#{v.lower()}"
         return None
 
     def _resolve_url(self, url: str, node_hash: str, base_path: str) -> str:
@@ -633,13 +682,22 @@ class MicronConverter:
                       authenticated: bool = False) -> str:
         """Render a Micron input field.
 
-        Mirrors `parseField()` in liamcottle/reticulum-meshchat MicronParser.js.
+        Matches the field-parsing logic in NomadNet's own MicronParser.py
+        (the `elif c == '<':` branch), which liamcottle/reticulum-meshchat's
+        MicronParser.js independently arrives at the same behavior for.
 
         Formats (the `\\`` is the required separator between flags|name and
         default/label):
           text/password : `<[size][!]|name\\`default>`
           checkbox      : `<?[size]|field_name|value[|*]\\`label>`
           radio         : `<^[size]|field_name|value[|*]\\`label>`
+
+        Note: NomadNet's own Guide.py teaches a slightly different checkbox/
+        radio style — leave the field's own label empty (`` `<?|name|value`> ``)
+        and write the visible label as plain text after the `>`. Embedding
+        the label inside the field (as shown above) is equally valid — the
+        parser accepts non-empty `field_data` as the label either way — it's
+        just not the style the guide's own examples use.
 
         `field_content` is everything between `<` and the backtick.
         `field_data` is everything between the backtick and `>`.
