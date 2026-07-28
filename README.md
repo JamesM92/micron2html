@@ -1,5 +1,10 @@
 # Micron2HTML
 
+[![CI](https://github.com/JamesM92/Micron2HTML/actions/workflows/ci.yml/badge.svg)](https://github.com/JamesM92/Micron2HTML/actions/workflows/ci.yml)
+[![Security](https://github.com/JamesM92/Micron2HTML/actions/workflows/security.yml/badge.svg)](https://github.com/JamesM92/Micron2HTML/actions/workflows/security.yml)
+[![PyPI version](https://img.shields.io/pypi/v/micron2html.svg)](https://pypi.org/project/micron2html/)
+[![Python versions](https://img.shields.io/pypi/pyversions/micron2html.svg)](https://pypi.org/project/micron2html/)
+
 A Python library and CLI tool that converts [Micron](https://github.com/markqvist/NomadNet) markup to HTML.
 
 Micron is the terminal markup language used by [NomadNet](https://github.com/markqvist/NomadNet) nodes. This library lets you render Micron pages in web browsers and other HTML-capable environments.

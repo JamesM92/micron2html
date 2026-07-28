@@ -10,6 +10,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), and this pro
 - **Page-level `#!bg=`/`#!fg=` headers now reject 6-hex values.** `_parse_header_color()` previously accepted both 3-hex (`#!bg=2a2`) and 6-hex (`#!bg=112233`) forms. Only the inline `` `Fxxx ``/`` `Bxxx `` tokens were ever restricted to 3-hex; the page-header path was an inconsistent leftover. Both colour paths now use the same 3-hex-shorthand format exclusively (each nibble doubled).
 - **Removed stale docs for the dropped `` `FTxxxxxx ``/`` `BTxxxxxx `` inline format.** The 24-bit inline extension was removed from the parser in v1.0.2, but [README.md](README.md) and [examples/showcase.mu](examples/showcase.mu) still described/demonstrated it. Docs and the example page now only show the supported 3-hex shorthand.
 
+## [1.0.8]
+
+### Changed
+
+- **Python support window updated:** dropped Python 3.9 (EOL October 2025), added Python 3.13 and 3.14. `requires-python` is now `>=3.10`. Classifiers and the CI test matrix updated to match.
+- **Stricter field-spec width parsing.** [converter.py](converter.py) field-spec width parsing now uses an `isdigit()` guard instead of a `try / except ValueError`. Behavior is unchanged for any well-formed Micron input. Edge case: previously a leading sign (`+5`, `-5`) or whitespace would have been accepted by `int()`; these now correctly fall back to the default width. Resolves CodeQL `py/empty-except` quality alert at the source rather than documenting around it.
+
+### Infrastructure
+
+- Bumped all GitHub Actions to their current major versions (Node 24 runtime): `actions/checkout` v4 → v6, `actions/setup-python` v5 → v6, `actions/upload-artifact` v4 → v7, `actions/dependency-review-action` v4 → v5, `github/codeql-action` v3 → v4.
+- Enabled GitHub Dependency Graph + Dependabot security alerts on the repository so the `dependency-review` PR check actually runs (previously failing silently with a setup error).
+- Added Dependabot config (monthly cadence for `pip` + `github-actions`).
+- Added CI / Security / PyPI / Python-version badges to the README.
+- Branch protection on `main` requires the CI matrix, build, pip-audit, and CodeQL checks to pass.
+
+## [1.0.7]
+
+### Infrastructure
+
+- Added GitHub Actions CI: pytest matrix across Python 3.9–3.12, sdist + wheel build, and `twine check`.
+- Added security workflow: `pip-audit` for dependency CVEs, GitHub `dependency-review` on PRs, and CodeQL static analysis with `security-and-quality` queries, plus a weekly scheduled run to catch newly-disclosed vulnerabilities.
+- Added PyPI publish workflow using Trusted Publishing (OIDC) — releases are built and uploaded automatically on GitHub Release publication, with no long-lived API tokens stored in the repo.
+
+No functional code changes since 1.0.6.
+
 ## [1.0.5]
 
 ### Changed
