@@ -174,6 +174,18 @@ class TestColors:
         assert "color:#" not in out  # no colour applied
         assert "brown" in out
 
+    def test_header_fg_bg_3digit(self, conv):
+        out = conv.convert("#!bg=333\n#!fg=aaa\nhello")
+        assert "background-color:#333333" in out
+        assert "color:#aaaaaa" in out
+
+    def test_header_fg_bg_6digit_not_supported(self, conv):
+        # Page-level headers use the same 3-hex shorthand as inline colours —
+        # 6-hex values are invalid and silently produce no colour.
+        out = conv.convert("#!bg=112233\n#!fg=aabbcc\nhello")
+        assert "background-color" not in out
+        assert "color:#" not in out
+
     def test_line_level_bg_not_applied_to_div(self, conv):
         # MeshChat parity: a leading B token doesn't fill the entire line —
         # only the explicit span gets the background.

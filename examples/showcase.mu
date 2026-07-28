@@ -21,8 +21,6 @@
 
 `F4af Foreground colour `f and `Bf40 background colour `b in 3-hex shorthand.
 
-`FT00ff88 Foreground in 6-hex true colour `f for fine-grained control.
-
 `Faaa Dim grey `f text used for muted secondary content.
 
 -~
