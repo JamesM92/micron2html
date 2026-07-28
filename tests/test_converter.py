@@ -55,12 +55,12 @@ class TestHeadings:
         assert 'class="mu-h1"' in out
         assert "<strong>" in out
 
-    def test_empty_heading_emits_blank_line(self, conv):
-        # Deliberate deviation from NomadNet: its parse_line() returns None
-        # for an empty heading (no row at all). We render a blank row
-        # instead — collapsing the line entirely reads as a bug in HTML.
+    def test_empty_heading_emits_nothing(self, conv):
+        # NomadNet: parse_line() returns None for an empty heading — no
+        # row, no blank space.
         out = conv.convert(">")
-        assert 'mu-blank' in out
+        assert 'mu-blank' not in out
+        assert out.strip() == ""
 
 
 # ---------------------------------------------------------------------------
@@ -303,15 +303,199 @@ class TestLinks:
         )
         assert 'data-field-spec="action=register"' in out
 
-    def test_link_multi_field_spec_preserves_all(self, conv):
-        # Regression: earlier versions only captured parts[2] and dropped
-        # every field after the first. The full backtick-separated spec
-        # must be preserved so the renderer can forward each key=value.
+    def test_link_multi_field_spec_uses_pipes_not_extra_backticks(self, conv):
+        # NomadNet-native form: multiple fields go in ONE backtick-delimited
+        # segment, pipe-separated.
+        out = conv.convert(
+            "`[Go`:/page/x.mu`a=1|b=2|c=3]",
+            node_hash="deadbeef",
+        )
+        assert 'data-field-spec="a=1|b=2|c=3"' in out
+
+    def test_link_with_more_than_three_backtick_segments_renders_nothing(self, conv):
+        # NomadNet: more than 3 backtick-separated components makes the
+        # whole link vanish (link_url = ""), not a leniently-joined spec.
+        # This reverses a v1.0.3 fix that was solving a MeshChat-specific
+        # leniency, not real NomadNet behavior.
         out = conv.convert(
             "`[Go`:/page/x.mu`a=1`b=2`c=3]",
             node_hash="deadbeef",
         )
-        assert 'data-field-spec="a=1`b=2`c=3"' in out
+        assert "<a" not in out
+
+
+# ---------------------------------------------------------------------------
+# Anchors
+# ---------------------------------------------------------------------------
+
+class TestHeadingAnchors:
+    def test_heading_auto_anchor_slug(self, conv):
+        out = conv.convert("> Hello World")
+        assert 'id="hello-world"' in out
+
+    def test_heading_auto_anchor_strips_formatting_tokens(self, conv):
+        out = conv.convert("> `!Bold`! Heading")
+        assert 'id="bold-heading"' in out
+
+    def test_heading_auto_anchor_ampersand_and_punctuation(self, conv):
+        out = conv.convert("> Introduction & Setup")
+        assert 'id="introduction-setup"' in out
+
+    def test_heading_level_4_also_gets_auto_anchor(self, conv):
+        out = conv.convert(">>>> Deep Heading")
+        assert 'id="deep-heading"' in out
+
+    def test_heading_auto_anchor_collision_first_wins(self, conv):
+        out = conv.convert("> Same\n> Same")
+        assert out.count('id="same"') == 1
+
+    def test_empty_heading_no_anchor(self, conv):
+        out = conv.convert("> ")
+        assert 'id="' not in out
+
+
+class TestExplicitAnchors:
+    def test_explicit_anchor_zero_width(self, conv):
+        out = conv.convert("`:mark hello")
+        assert 'id="mark"' in out
+        assert 'class="mu-anchor"' in out
+        assert "hello" in out
+
+    def test_explicit_anchor_name_terminates_at_delimiter(self, conv):
+        out = conv.convert("`:foo-bar baz")
+        assert 'id="foo-bar"' in out
+
+    def test_explicit_anchor_alone_on_empty_line(self, conv):
+        out = conv.convert("`:onlyanchor")
+        assert 'id="onlyanchor"' in out
+
+    def test_explicit_and_heading_anchors_share_namespace(self, conv):
+        out = conv.convert("`:shared marker\n> Shared")
+        assert out.count('id="shared"') == 1
+
+    def test_multiple_explicit_anchors_on_one_line(self, conv):
+        out = conv.convert("`:first x `:second y")
+        assert 'id="first"' in out
+        assert 'id="second"' in out
+
+    def test_explicit_anchor_name_stops_before_special_chars(self, conv):
+        out = conv.convert("`:foo<script>alert(1)</script>")
+        assert 'id="foo"' in out
+        assert "<script>" not in out
+        assert "&lt;script&gt;" in out
+
+
+class TestAnchorLinks:
+    def test_named_anchor_link_href(self, conv):
+        out = conv.convert("`[Jump`#install-notes]")
+        assert 'href="#install-notes"' in out
+
+    def test_named_anchor_link_forward_reference_resolves(self, conv):
+        out = conv.convert("`[Jump`#later-section]\ntext\n> Later Section")
+        assert 'href="#later-section"' in out
+        assert 'id="later-section"' in out
+
+    def test_bare_hash_link_jumps_to_next_heading(self, conv):
+        out = conv.convert("`[Continue`#]\ntext\n> Next Section")
+        assert 'href="#next-section"' in out
+
+    def test_bare_hash_link_no_following_heading_falls_back(self, conv):
+        out = conv.convert("`[Continue`#]\ntext")
+        assert 'href="#"' in out
+
+    def test_bare_hash_link_skips_its_own_heading_line(self, conv):
+        out = conv.convert("> Heading with `[link`#] inside\n> Next")
+        assert 'href="#next"' in out
+
+    def test_convert_inline_bare_hash_link_does_not_crash(self, conv):
+        out = conv.convert_inline("`[x`#]")
+        assert 'href="#"' in out
+
+
+# ---------------------------------------------------------------------------
+# Tables
+# ---------------------------------------------------------------------------
+
+_TABLE_MU = (
+    "`t\n"
+    "| Name | Price | Qty |\n"
+    "| ---- | :---: | --: |\n"
+    "| `F3a3Apple`f | Free | `!5`! |\n"
+    "| Orange | Ask, nicely | 3 |\n"
+    "`t"
+)
+
+
+class TestTables:
+    def test_basic_table_renders_box_drawing(self, conv):
+        out = conv.convert(_TABLE_MU)
+        for ch in "┌┐└┘│┬┴┼":
+            assert ch in out
+        assert "Apple" in out
+        assert "Free" in out
+        assert "Orange" in out
+
+    def test_table_cell_formatting_renders(self, conv):
+        out = conv.convert(_TABLE_MU)
+        assert 'color:#33aa33' in out
+        assert "<strong>5</strong>" in out
+
+    def test_table_header_always_left_aligned(self, conv):
+        out = conv.convert(_TABLE_MU)
+        assert "│ Name   │" in out
+
+    def test_table_column_right_and_center_alignment(self, conv):
+        out = conv.convert(_TABLE_MU)
+        assert "│   3 │" in out  # Qty column, right-aligned
+        assert "│    Free" in out  # Price column, center-aligned
+
+    def test_table_min_column_width_three(self, conv):
+        out = conv.convert("`t\n| A | B |\n| --- | --- |\n| 1 | 2 |\n`t")
+        assert "───" in out  # 1-char columns still pad to width >= 3
+
+    def test_table_width_shrink_on_max_width_suffix(self, conv):
+        import re
+        out = conv.convert(
+            "`t15\n| VeryLongHeader | AnotherVeryLongOne |\n| --- | --- |\n"
+            "| xxxxxxxxxxxxxxxxxxxx | yyyyyyyyyyyyyyyyyyyy |\n`t"
+        )
+        for line in out.split("</div>"):
+            visible = re.sub(r"<[^>]+>", "", line)
+            assert len(visible) <= 20  # generous slack for the │ borders
+
+    def test_table_wrapped_in_mu_table_div(self, conv):
+        out = conv.convert(_TABLE_MU)
+        assert 'class="mu-table"' in out
+
+    def test_table_align_wraps_whole_table_and_resets(self, conv):
+        out = conv.convert("`tc\n| A | B |\n| --- | --- |\n| 1 | 2 |\n`t\nafter")
+        table_part, after_part = out.split("after")
+        assert "text-align:center" in table_part
+        assert "text-align:center" not in after_part
+
+    def test_table_escaped_pipe_in_cell_not_split(self, conv):
+        out = conv.convert("`t\n| A | B |\n| --- | --- |\n| x\\|y | 2 |\n`t")
+        assert "x|y" in out
+
+    def test_unclosed_table_flushes_at_eof(self, conv):
+        out = conv.convert("`t\n| A | B |\n| --- | --- |\n| 1 | 2 |")
+        assert 'class="mu-table"' in out
+        assert "┌" in out and "┘" in out
+
+    def test_table_inside_section_indents(self, conv):
+        out = conv.convert(">> Section\n`t\n| A | B |\n| --- | --- |\n| 1 | 2 |\n`t")
+        assert "margin-left:20px" in out
+
+    def test_empty_table_renders_nothing(self, conv):
+        out = conv.convert("`t\n`t")
+        assert out.strip() == ""
+
+    def test_table_body_lines_not_interpreted_as_micron(self, conv):
+        out = conv.convert(
+            "`t\n| A | B |\n| --- | --- |\n| > Not a heading | 2 |\n`t"
+        )
+        assert "mu-h1" not in out
+        assert "&gt; Not a heading" in out
 
 
 # ---------------------------------------------------------------------------
@@ -331,14 +515,21 @@ class TestPartials:
         assert "hash://abcdef/status.mu" in out
         assert "[live]" in out
 
-    def test_partial_fields_and_pid_are_discarded(self, conv):
-        # NomadNet's partial fields (pipe-separated, may include pid=) are
-        # only meaningful for the live async-refresh behavior this converter
-        # doesn't implement — only the URL survives into the rendered link.
+    def test_partial_fields_and_pid_are_exposed_as_data_attrs(self, conv):
+        # No live-refresh JS is shipped, but the refresh/fields/pid data is
+        # exposed via data-* attributes so a consuming web app can wire up
+        # its own refresh behaviour if it wants to.
         out = conv.convert("`{hash:/abcdef/status.mu`10`action=view|pid=main}")
         assert "hash://abcdef/status.mu" in out
-        assert "action=view" not in out
-        assert "pid=main" not in out
+        assert 'data-refresh="10.0"' in out
+        assert 'data-fields="action=view|pid=main"' in out
+        assert 'data-pid="main"' in out
+
+    def test_partial_refresh_below_one_is_disabled(self, conv):
+        # NomadNet: a refresh value < 1 (including 0) disables refresh
+        # entirely — not just "falsy", an explicit threshold.
+        out = conv.convert("`{hash:/abcdef/status.mu`0.5}")
+        assert "data-refresh" not in out
 
     def test_partial_unclosed_renders_literal_brace(self, conv):
         out = conv.convert("`{hash:/abcdef/status.mu")
@@ -351,14 +542,19 @@ class TestPartials:
 # ---------------------------------------------------------------------------
 
 class TestLiteral:
-    def test_literal_block(self, conv):
+    def test_inline_backtick_equals_is_not_a_literal_toggle(self, conv):
+        # NomadNet: `= only has meaning as a WHOLE line by itself (handled
+        # in _process_line's multi-line block form). Mid-line, it's just an
+        # unrecognized token — silently consumed like any other — so `!
+        # still toggles bold normally around it. This is a behavior change
+        # from an earlier Micron2HTML-only extension (undocumented inline
+        # literal toggling) that had no real-NomadNet equivalent.
         out = conv.convert("`=`!not bold`=`!")
-        # The bold token inside literal should appear as text
-        assert "&grave;" in out or "`!not bold`!" in out or "`!" in out
+        assert "<strong>not bold</strong>" in out
 
-    def test_literal_prevents_bold(self, conv):
+    def test_inline_backtick_equals_does_not_suppress_bold(self, conv):
         out = conv.convert("`= `! `=")
-        assert "<strong>" not in out
+        assert "<strong>" in out
 
 
 # ---------------------------------------------------------------------------

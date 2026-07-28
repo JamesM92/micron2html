@@ -197,6 +197,23 @@ strong {
   font-style: italic;
 }
 
+/* ---- Explicit anchors (`:name) -----------------------------------------
+ * Zero-width jump target — defensive-only, an empty <span> shouldn't take
+ * width by default, but this is cheap insurance against monospace
+ * column-alignment drift from any browser quirk. */
+.mu-anchor {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ---- Tables (`t ... `t) -------------------------------------------------
+ * Rendered as box-drawing-character ASCII art, same as real NomadNet — the
+ * horizontal alignment is already baked into the padded cell text itself,
+ * so this class is just a marker/CSS hook, not load-bearing for layout. */
+.mu-table { display: block; }
+
 /* ---- Literal blocks (`= ... `=) --------------------------------------
  * Plain pre-styled text — no border, no bg, no padding. MeshChat doesn't
  * box literal content; it flows inline at the same font/colour as the

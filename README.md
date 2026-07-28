@@ -167,7 +167,21 @@ A custom divider character only takes effect when the line is *exactly* two char
 `[Label`hash://a1b2c3/page.mu]       Node link (resolved against node_hash)
 ```
 
-Links can also submit form-field data to a node-side page: `` `[Label`url`fields] ``, where `fields` is a single pipe-separated segment — `*` (submit every field on the page), field names to include (`username|auth_token`), or literal `key=value` pairs, mixable in any order (`*|action=preview|id=42`). The parsed spec is emitted verbatim as `data-field-spec` for the consuming application to read. Micron2HTML is also lenient about extra backtick-separated segments after the fields (`` `[Label`url`a=1`b=2] ``) and joins them back together rather than dropping the link — real NomadNet renders nothing at all for that malformed form, so stick to pipes for anything meant to work across clients.
+Links can also submit form-field data to a node-side page: `` `[Label`url`fields] ``, where `fields` is a single pipe-separated segment — `*` (submit every field on the page), field names to include (`username|auth_token`), or literal `key=value` pairs, mixable in any order (`*|action=preview|id=42`). The parsed spec is emitted verbatim as `data-field-spec` for the consuming application to read. A link with more than 3 backtick-separated components (e.g. `` `[Label`url`a=1`b=2] ``, extra fields separated by backticks instead of pipes) renders nothing at all, matching NomadNet exactly — always use pipes for multiple fields.
+
+### Anchors
+
+```
+`:name                                Declare an anchor at this point (zero-width, renders nothing)
+`[Label`#name]                        Jump to a named anchor on this page
+`[Label`#]                            Jump to the next `>` heading after this link's position
+```
+
+Every heading also becomes an anchor automatically, named by slugifying its text: lowercase, runs of non-alphanumeric characters collapsed to a single hyphen, leading/trailing hyphens stripped. `` >Hello World `` → anchor `hello-world`; `` >Introduction & Setup `` → `introduction-setup`. Explicit `` `:name `` anchors and heading auto-anchors share one namespace per page — if a name collides, the first one declared wins.
+
+Named-anchor links (`` `[Label`#name] ``) resolve to a plain `href="#name"` and work regardless of document order, since HTML's own fragment navigation resolves against whatever element ends up with that `id`. The bare `` `[Label`#] `` form is different: it looks forward from its own position in the document for the nearest following heading and links to that — useful for "Continue ↓" buttons without naming every section. `slugify_micron()` (also exported from the package) is available standalone if you want to build your own table of contents from a Micron document.
+
+Cross-page anchors (linking to a named anchor on a *different* page) use NomadNet's own `anchor=name` request-field convention rather than a URL fragment, and are out of scope here — a single `convert()` call over one page's text has no way to know another page's heading layout.
 
 ### Partials
 
@@ -177,7 +191,7 @@ Links can also submit form-field data to a node-side page: `` `[Label`url`fields
 `{URL`refresh`field1|field2|pid=x}    Partial with request fields; `pid=` targets a specific partial for refresh
 ```
 
-In real NomadNet, a partial asynchronously loads a fragment of another page and (optionally) re-fetches it in place on an interval — see NomadNet's Guide, "Partials" section. That's not something a one-shot markup→HTML conversion can reproduce without adding JavaScript, so Micron2HTML renders a plain `<a class="mu-dynamic">[live]</a>` link to the target URL instead. The `refresh` and `field`/`pid` components are discarded entirely — only the URL is used. See [Known limitations](#known-limitations).
+In real NomadNet, a partial asynchronously loads a fragment of another page and (optionally) re-fetches it in place on an interval — see NomadNet's Guide, "Partials" section. That's not something a one-shot markup→HTML conversion can reproduce without adding JavaScript, so Micron2HTML renders a plain `<a class="mu-dynamic">[live]</a>` link to the target URL instead — but the `refresh`/`fields`/`pid` data isn't thrown away: it's exposed as `data-refresh`, `data-fields`, and `data-pid` attributes on that link, so a consuming web app can wire up its own live-refresh behaviour if it wants to. `refresh` only becomes a `data-refresh` attribute if it parses as a number `>= 1` (matching NomadNet's own "0 or omitted disables it" rule). See [Known limitations](#known-limitations).
 
 ### Literal blocks
 
@@ -187,6 +201,21 @@ This text is rendered verbatim in a <pre> block.
 No Micron formatting is applied inside.
 `=
 ```
+
+Each `` `= `` must be **alone on its own line** — that's the only form NomadNet recognizes as a literal-block toggle. `` `= `` appearing mid-line, with other content around it, isn't special syntax at all; it's just consumed as an unrecognized token like any other.
+
+### Tables
+
+```
+`t
+| Name | Price | Qty |
+| ---- | :---: | --: |
+| Apple | Free | 5 |
+| Orange | Ask, nicely | 3 |
+`t
+```
+
+Renders as literal box-drawing-character ASCII art (`┌───┬───┐` borders, padded monospace cells) inside the normal text flow — not a semantic HTML `<table>` — matching what real NomadNet actually shows. The first row is the header (always left-aligned); the second is a markdown-style alignment separator (`:---:` center, `---:` right, anything else left); remaining rows are data. Column width is the widest cell in that column (ignoring Micron formatting tokens for the width calculation, floor of 3 characters); cell text itself still gets parsed normally, so a colour or bold token inside a cell renders correctly. `` `t `` can take an optional alignment letter and/or max-width number right after it (e.g. `` `tc30 ``) to center/right/left-align the whole table and cap its total width — wide tables get their widest columns shrunk down to fit. Use `\|` inside a cell for a literal pipe character.
 
 ### Form fields
 
@@ -206,13 +235,10 @@ NomadNet's Guide actually favors leaving the checkbox/radio field's own label em
 
 ## Known limitations
 
-Syntax NomadNet supports that this converter doesn't implement, or implements as a deliberate simplification:
-
-- **Tables** (`` `t ``/`` `t ``-wrapped markdown-style tables) — not implemented. A `` `t `` line currently renders as plain text.
-- **Anchors** — auto-anchors from heading slugs, explicit `` `:name `` declarations, and `` `[label`#name] ``/`` `[label`#] `` jump links are not implemented. Links with a `#`-prefixed URL resolve like any other relative link rather than scrolling to a page position.
-- **Partials** — implemented as a static link only; no auto-refresh, no request fields. See [Partials](#partials) above.
-- **Alignment tags must appear at the start of a line** per NomadNet's Guide; this converter accepts `` `c ``/`` `l ``/`` `r ``/`` `a `` anywhere inline. This is a superset of NomadNet's behavior (it accepts more input, not less), so correctly-authored NomadNet pages aren't affected.
-- **The literal-block toggle `` `= `` only fires on a line that is *exactly* `` `= `` and nothing else** in NomadNet; this converter also supports it as an inline mid-line toggle. Same superset relationship as above.
+- **Partials render as a static link only** — no actual live auto-refresh happens (the `refresh`/`fields`/`pid` data is exposed via `data-*` attributes for a consuming app to use, but no JS ships with this library). See [Partials](#partials) above.
+- **Table column widths use `len()`, not `wcwidth`** — NomadNet's own table renderer consults `wcwidth` for double-width Unicode glyphs; this converter doesn't, to avoid adding a runtime dependency this library has never had. Tables with wide (e.g. CJK) characters in cells may not align columns as precisely as real NomadNet would.
+- **The table width-shrink algorithm is a faithful-effort approximation**, not a byte-for-byte port of NomadNet's exact "proportionally shrink the widest columns" formula (which isn't fully specified in the reference source) — it greedily shrinks the single widest column by one character at a time until the table fits.
+- **A rare anchor-collision edge case**: the bare `` `[label`#] `` "jump to next heading" link is resolved by a pre-pass that only simulates *other headings* claiming anchor slugs, not explicit `` `:name `` anchors declared during the real render. If an explicit anchor earlier in the document happens to claim the exact slug a later heading would auto-generate, that heading loses its `id` (correct first-wins behavior), but a bare-hash link could still point at `href="#name"` where `name` belongs to the earlier anchor rather than the heading — a nearby, valid target, just not the intended one. Requires a deliberate or coincidental naming collision to trigger.
 
 ## Security
 
