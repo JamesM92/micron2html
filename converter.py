@@ -658,20 +658,22 @@ class MicronConverter:
     def _parse_header_color(self, value: str) -> Optional[str]:
         """Parse a #!fg=X or #!bg=X page-header color value.
 
-        Unlike the inline `Fxxx`/`Bxxx` tokens (deliberately 3-hex-only, see
-        `_parse_color`), Guide.py's "Page Foreground and Background Colors"
-        section states no length restriction for the header value — it just
-        gives a 3-hex example (`#!bg=444`). NomadNet's colour-rendering
-        helpers (`low_color`/`high_color` in MicronParser.py) generically
-        handle both 3-hex and 6-hex strings, so headers accept both here too.
+        3-hex only. Guide.py's "Page Foreground and Background Colors"
+        section doesn't actually state a length restriction for the header
+        value — it just gives a 3-hex example (`#!bg=444`) — and NomadNet's
+        colour-rendering helpers technically accept 6-hex strings too. We
+        deliberately restrict to 3-hex anyway, for the same reason as the
+        inline `Fxxx`/`Bxxx` tags (see `_parse_color`): there's no marker
+        distinguishing "3-hex" from "6-hex" the way the inline tags use a
+        `T` prefix, so allowing both here just means a mistyped or
+        ambiguous value silently changes meaning depending on its length.
+        One fixed width, applied consistently everywhere, is safer.
 
         Returns CSS color string or None.
         """
         v = value.strip()
         if len(v) == 3 and all(c in _HEX for c in v):
             return "#" + "".join(c * 2 for c in v).lower()
-        if len(v) == 6 and all(c in _HEX for c in v):
-            return f"#{v.lower()}"
         return None
 
     def _resolve_url(self, url: str, node_hash: str, base_path: str) -> str:

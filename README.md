@@ -110,11 +110,11 @@ micron-convert page.mu --format text
 ```
 # This is a comment — the whole line is stripped from output
 
-#!bg=2a2a2a   Set page background colour (3 or 6 hex digits)
-#!fg=aaa      Set page foreground colour
+#!bg=2a2   Set page background colour (3-hex shorthand: each digit doubled)
+#!fg=aaa   Set page foreground colour
 ```
 
-Unlike the inline `` `Fxxx ``/`` `Bxxx `` tags below, these headers aren't restricted to 3-hex — NomadNet's Guide gives a 3-hex example but doesn't state a length restriction, and both forms render correctly.
+Deliberately 3-hex-only, matching the inline `` `Fxxx ``/`` `Bxxx `` tags below — NomadNet's own docs would technically permit a 6-hex value here too, but without a marker distinguishing the two (the way the inline tags would need a `T` prefix), a value's meaning would silently depend on its length. One fixed width, applied consistently, is safer.
 
 ### Headings and sections
 

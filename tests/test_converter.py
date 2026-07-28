@@ -201,14 +201,14 @@ class TestColors:
         assert "background-color:#333333" in out
         assert "color:#aaaaaa" in out
 
-    def test_header_fg_bg_6digit(self, conv):
-        # Unlike the inline `Fxxx`/`Bxxx` tokens (3-hex-only by design),
-        # page-level #!bg=/#!fg= headers accept 6-hex too — NomadNet's
-        # Guide.py doesn't restrict the header value's length the way it
-        # restricts the inline colour tags.
+    def test_header_fg_bg_6digit_not_supported(self, conv):
+        # Deliberately 3-hex-only, same as the inline colour tags: with no
+        # marker distinguishing 3-hex from 6-hex, allowing both would make
+        # a value's meaning depend silently on its length. NomadNet's own
+        # docs would technically permit 6-hex here, but we don't chase it.
         out = conv.convert("#!bg=112233\n#!fg=aabbcc\nhello")
-        assert "background-color:#112233" in out
-        assert "color:#aabbcc" in out
+        assert "background-color" not in out
+        assert "color:#" not in out
 
     def test_line_level_bg_not_applied_to_div(self, conv):
         # NomadNet: `B` only sets colour state used per text part as it's
