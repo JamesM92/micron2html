@@ -615,12 +615,14 @@ class MicronConverter:
         return None, i
 
     def _parse_header_color(self, value: str) -> Optional[str]:
-        """Parse a #!fg=X or #!bg=X color value.  Returns CSS color or None."""
+        """Parse a #!fg=X or #!bg=X color value.  Returns CSS color or None.
+
+        3-hex only, matching the inline `Fxxx`/`Bxxx` colour format —
+        each nibble is doubled (f -> ff, 8 -> 88, 0 -> 00).
+        """
         v = value.strip()
         if len(v) == 3 and all(c in _HEX for c in v):
             return "#" + "".join(c * 2 for c in v).lower()
-        if len(v) == 6 and all(c in _HEX for c in v):
-            return f"#{v.lower()}"
         return None
 
     def _resolve_url(self, url: str, node_hash: str, base_path: str) -> str:

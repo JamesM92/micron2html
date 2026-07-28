@@ -3,6 +3,13 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- **Page-level `#!bg=`/`#!fg=` headers now reject 6-hex values.** `_parse_header_color()` previously accepted both 3-hex (`#!bg=2a2`) and 6-hex (`#!bg=112233`) forms. Only the inline `` `Fxxx ``/`` `Bxxx `` tokens were ever restricted to 3-hex; the page-header path was an inconsistent leftover. Both colour paths now use the same 3-hex-shorthand format exclusively (each nibble doubled).
+- **Removed stale docs for the dropped `` `FTxxxxxx ``/`` `BTxxxxxx `` inline format.** The 24-bit inline extension was removed from the parser in v1.0.2, but [README.md](README.md) and [examples/showcase.mu](examples/showcase.mu) still described/demonstrated it. Docs and the example page now only show the supported 3-hex shorthand.
+
 ## [1.0.5]
 
 ### Changed

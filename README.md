@@ -97,8 +97,8 @@ micron-convert page.mu --node-hash a1b2c3d4e5f6...
 ```
 # This is a comment — the whole line is stripped from output
 
-#!bg=2a2a2a   Set page background colour (3 or 6 hex digits)
-#!fg=aaaaaa   Set page foreground colour
+#!bg=2a2   Set page background colour (3-hex shorthand: each digit doubled)
+#!fg=aaa   Set page foreground colour
 ```
 
 ### Headings and sections
@@ -125,11 +125,9 @@ micron-convert page.mu --node-hash a1b2c3d4e5f6...
 `_text`_      Underline
 
 `Fxxx         Set foreground colour (3-hex shorthand: each digit doubled — F40 → #ff4400)
-`FTxxxxxx     Set foreground colour (6-hex true colour)
 `f            Reset foreground colour to default
 
 `Bxxx         Set background colour (3-hex shorthand)
-`BTxxxxxx     Set background colour (6-hex)
 `b            Reset background colour to default
 
 ``            Reset ALL inline formatting (bold, italic, underline, colours, alignment)
