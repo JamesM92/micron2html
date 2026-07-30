@@ -240,7 +240,7 @@ class _InlineState:
     bold: bool = False
     italic: bool = False
     underline: bool = False
-    tag_stack: list = field(default_factory=list)  # list of (type_str, close_html)
+    tag_stack: list = field(default_factory=list)  # list of (type_str, open_html, close_html)
 
 
 # ---------------------------------------------------------------------------
@@ -548,33 +548,30 @@ class MicronConverter:
                 # Bold  (`!)
                 elif nc == "!":
                     if state.bold:
-                        out.append("</strong>")
-                        self._pop_tag(state, "strong")
+                        self._close_innermost(state, "strong", out)
                     else:
                         out.append("<strong>")
-                        state.tag_stack.append(("strong", "</strong>"))
+                        state.tag_stack.append(("strong", "<strong>", "</strong>"))
                     state.bold = not state.bold
                     i += 1
 
                 # Underline  (`_)
                 elif nc == "_":
                     if state.underline:
-                        out.append("</span>")
-                        self._pop_tag(state, "underline")
+                        self._close_innermost(state, "underline", out)
                     else:
                         out.append('<span class="mu-ul">')
-                        state.tag_stack.append(("underline", "</span>"))
+                        state.tag_stack.append(("underline", '<span class="mu-ul">', "</span>"))
                     state.underline = not state.underline
                     i += 1
 
                 # Italic  (`*)
                 elif nc == "*":
                     if state.italic:
-                        out.append("</em>")
-                        self._pop_tag(state, "em")
+                        self._close_innermost(state, "em", out)
                     else:
                         out.append("<em>")
-                        state.tag_stack.append(("em", "</em>"))
+                        state.tag_stack.append(("em", "<em>", "</em>"))
                     state.italic = not state.italic
                     i += 1
 
@@ -583,8 +580,9 @@ class MicronConverter:
                     i += 1
                     color, i = self._parse_color(text, i, n)
                     if color:
-                        out.append(f'<span style="color:{color}">')
-                        state.tag_stack.append(("fg", "</span>"))
+                        open_html = f'<span style="color:{color}">'
+                        out.append(open_html)
+                        state.tag_stack.append(("fg", open_html, "</span>"))
 
                 # Reset foreground  (`f)
                 elif nc == "f":
@@ -596,8 +594,9 @@ class MicronConverter:
                     i += 1
                     color, i = self._parse_color(text, i, n)
                     if color:
-                        out.append(f'<span style="background-color:{color}">')
-                        state.tag_stack.append(("bg", "</span>"))
+                        open_html = f'<span style="background-color:{color}">'
+                        out.append(open_html)
+                        state.tag_stack.append(("bg", open_html, "</span>"))
 
                 # Reset background  (`b)
                 elif nc == "b":
@@ -972,21 +971,31 @@ class MicronConverter:
                 f'value="{html.escape(field_data)}" '
                 f'size="{field_width}"{dis} class="mu-field">')
 
-    def _pop_tag(self, state: _InlineState, tag_type: str) -> None:
-        for j in range(len(state.tag_stack) - 1, -1, -1):
-            if state.tag_stack[j][0] == tag_type:
-                state.tag_stack.pop(j)
-                return
-
     def _close_innermost(self, state: _InlineState, tag_type: str, out: list) -> None:
+        """Close the named tag, wherever it sits in the stack.
+
+        HTML closing tags are positional/LIFO, so closing something that
+        isn't currently innermost can't just emit its close tag in place —
+        that would close whatever *is* innermost instead. Unwind: close
+        every entry above the target (innermost-first), close the target
+        itself, then reopen the unwound entries (in their original order)
+        as fresh elements and push them back. Same colour/bold/etc. either
+        side, just split across an extra pair of tags at the unwind point.
+        """
         for j in range(len(state.tag_stack) - 1, -1, -1):
             if state.tag_stack[j][0] == tag_type:
-                out.append(state.tag_stack[j][1])
-                state.tag_stack.pop(j)
+                above = state.tag_stack[j + 1:]
+                for _, _, close_html in reversed(above):
+                    out.append(close_html)
+                out.append(state.tag_stack[j][2])
+                del state.tag_stack[j:]
+                for entry in above:
+                    out.append(entry[1])
+                    state.tag_stack.append(entry)
                 return
 
     def _close_all(self, state: _InlineState) -> list:
-        tags = [close for _, close in reversed(state.tag_stack)]
+        tags = [close for _, _, close in reversed(state.tag_stack)]
         state.tag_stack.clear()
         state.bold = state.italic = state.underline = False
         return tags

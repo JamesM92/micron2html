@@ -164,6 +164,63 @@ class TestFormatting:
 
 
 # ---------------------------------------------------------------------------
+# Tag nesting (out-of-order close / unwind-reopen)
+#
+# HTML closing tags are positional/LIFO. Closing a non-innermost open tag
+# (e.g. `b while `F is still open) can't just emit its close tag in place —
+# that would close whatever's actually innermost instead. These tests lock
+# in the unwind (close innermost-first down to the target, then reopen the
+# unwound tags) that keeps HTML nesting valid regardless of stack order.
+# ---------------------------------------------------------------------------
+
+class TestTagNesting:
+    def _assert_balanced(self, out):
+        import re
+        stack = []
+        for m in re.finditer(r'</?(strong|em|span)\b[^>]*>', out):
+            tag = m.group(0)
+            if tag.startswith("</"):
+                name = re.match(r'</(\w+)', tag).group(1)
+                assert stack and stack[-1] == name, f"mismatched close {tag!r} in {out!r}"
+                stack.pop()
+            else:
+                stack.append(re.match(r'<(\w+)', tag).group(1))
+        assert not stack, f"unclosed tags {stack} in {out!r}"
+
+    def test_bg_close_while_fg_still_open_unwinds_correctly(self, conv):
+        # Regression: `b closing "bg" while a later-opened "fg" span is
+        # still on top of the stack must close fg first, then bg, then
+        # reopen fg — not just emit </span> in place (which would close fg,
+        # not bg, in the real DOM).
+        out = conv.convert("`B777 X`f `F975`b <>`F333", authenticated=True)
+        self._assert_balanced(out)
+        # bg's own close must appear before "<>" is reached, not float to EOL
+        bg_close_pos = out.index("</span></span>")  # fg empty-close + bg close
+        after_pos = out.index("&lt;&gt;")
+        assert bg_close_pos < after_pos
+        # the reopened fg span must actually wrap "<>" so it's still coloured
+        assert '<span style="color:#997755"> &lt;&gt;' in out
+
+    def test_bold_close_while_fg_still_open_unwinds_correctly(self, conv):
+        out = conv.convert("`!X`F975 Y`!Z`f", authenticated=True)
+        self._assert_balanced(out)
+        # bold must close before "Z" is emitted — not swallow it.
+        assert out.index("</strong>") < out.index("Z")
+
+    def test_triple_nested_outermost_close_unwinds_two_levels(self, conv):
+        out = conv.convert("`!`_`*deep`!more`_more2`*end", authenticated=True)
+        self._assert_balanced(out)
+        assert "<strong><span class=\"mu-ul\"><em>deep</em></span></strong>" in out
+
+    def test_isolated_close_without_interleaving_still_works(self, conv):
+        # Baseline: closing the genuinely-innermost tag needs no unwind at
+        # all — must keep working exactly as before.
+        out = conv.convert("`B777 X`f`b <>", authenticated=True)
+        self._assert_balanced(out)
+        assert out.count("<span") == out.count("</span>") == 1
+
+
+# ---------------------------------------------------------------------------
 # Colors
 # ---------------------------------------------------------------------------
 
