@@ -3,12 +3,49 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-07-30
+
+### Changed — goal correction: MeshChat parity → NomadNet parity
+
+The project's stated design goal was "MeshChat parity" (matching [Reticulum MeshChat](https://github.com/liamcottle/reticulum-meshchat)'s `MicronParser.js`). That target was corrected to full NomadNet parity — rendering Micron the way the real [NomadNet](https://github.com/markqvist/NomadNet) client would, in both directions, per its own [Guide.py](https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/Guide.py) (the in-app spec for page authors), [MicronParser.py](https://github.com/markqvist/NomadNet/blob/master/nomadnet/ui/textui/MicronParser.py) (the reference implementation), and RNS's `MarkdownToMicron.format_table_raw` (the table-rendering algorithm), all fetched and read line-by-line for this pass. Most of what was previously justified as "MeshChat parity" turned out to already match NomadNet's own behavior too (unknown-token consumption, the field backtick requirement, heading depth limits, no line-level `B` fill, alignment tokens working anywhere inline) — those comments were relabeled without any behavior change.
+
+**New features, previously unimplemented:**
+
+- **Tables** (`` `t ``). Rendered as literal box-drawing-character ASCII art — the same visual approach real NomadNet uses — not a semantic HTML `<table>`, for genuine visual parity. Supports markdown-style header/separator/data rows, per-column alignment, minimum column width, an optional whole-table alignment + max-width suffix (`` `tc30 ``), and escaped pipes in cell content. Column widths use `len()` rather than `wcwidth` (documented simplification — avoids a new runtime dependency).
+- **Anchors** — heading auto-anchors (slugified heading text, e.g. `>Hello World` → `id="hello-world"`), explicit `` `:name `` declarations (zero-width, first-declared-wins shared namespace), `` `[label`#name] `` named jump links, and bare `` `[label`#] `` "jump to the next heading" links. `slugify_micron()` is exported from the package.
+
+**Real, code-level behavior changes** (both reverse previously-shipped, explicitly-tested Micron2HTML-only leniencies/extensions that have no equivalent in real NomadNet):
+
+- **The inline mid-line literal-block toggle is removed.** `` `=...`= `` usable anywhere within a single line was a Micron2HTML-only extension with no real NomadNet equivalent — NomadNet's `` `= `` toggle only fires on a line that is *exactly* `` `= `` and nothing else (the multi-line block form, already correct). `` `=`!not bold`=`! `` now renders "not bold" as **bolded** text (the `` `= `` tokens are silently consumed like any unrecognized token, `` `! `` toggles bold normally around them) instead of suppressing the bold.
+- **Link field-specs with more than 3 backtick-separated segments now render nothing at all**, matching NomadNet exactly (`` `[label`url`a=1`b=2`c=3] `` → no `<a>` tag, not even fallback text). This reverses a v1.0.3 fix that leniently joined the extra segments back together — that fix was solving a MeshChat-specific quirk, not real NomadNet behavior (NomadNet's own link parser sets the URL to empty and skips emitting anything when there are more than 3 components). The correct, NomadNet-native way to pass multiple fields — a single pipe-separated segment (`` `[label`url`a=1|b=2|c=3] ``) — is unaffected and unchanged.
+- **Empty heading lines now emit nothing** (no row, no blank space), matching NomadNet's `parse_line()` returning `None`. Reverses a deliberate deviation made earlier in this same body of work (rendering a visible blank row) once the broader goal was clarified to be exact parity rather than "whatever reads best in isolation."
+
+**Partials get richer, still without shipping JS:**
+
+- `` `{url`refresh`fields} ``'s `refresh` and `fields` (pipe-separated, may include `pid=`) components — previously silently discarded — are now exposed as `data-refresh`, `data-fields`, and `data-pid` attributes on the rendered link, so a consuming web app can wire up its own live-refresh behavior if it wants to. `refresh` only becomes `data-refresh` if it parses as a number `>= 1`, matching NomadNet's own "0 or omitted disables it" rule. Still no live refresh happens inside this library itself — that would require shipping JS, which this pure-Python library never has.
+
+**Docs corrected to match:**
+
+- Checkbox/radio field docs now also show NomadNet's own canonical style (empty field label, visible text written after the `>`) alongside the embedded-label form.
+- Link field-specs' primary documented syntax is now pipe-separated (`` `[label`url`a=1|b=2] ``), matching NomadNet's actual syntax.
+- README's "Known limitations" no longer lists tables, anchors, or "alignment tags must appear at line start" (the last of those was never a real parser rule to begin with — Guide.py's line-start wording is author style advice, not something `make_output()` actually enforces; Micron2HTML already matched real NomadNet's permissive behavior there). What's left: the partials live-refresh gap, the `wcwidth` and table-shrink-formula approximations, and a rare anchor-collision edge case in the bare-hash pre-pass — see README for details.
+
+See [README.md](README.md) for the full corrected syntax reference.
 
 ### Fixed
 
-- **Page-level `#!bg=`/`#!fg=` headers now reject 6-hex values.** `_parse_header_color()` previously accepted both 3-hex (`#!bg=2a2`) and 6-hex (`#!bg=112233`) forms. Only the inline `` `Fxxx ``/`` `Bxxx `` tokens were ever restricted to 3-hex; the page-header path was an inconsistent leftover. Both colour paths now use the same 3-hex-shorthand format exclusively (each nibble doubled).
+- **Out-of-order tag closes produced mismatched HTML nesting.** `_close_innermost()`/`_pop_tag()` (used by `` `b ``/`` `f `` and the `` `! ``/`` `_ ``/`` `* `` toggles) searched the open-tag stack for the target type and popped it from the middle when it wasn't actually innermost, but still emitted the close tag at the *current* output position — which a browser applies LIFO, so it closed whatever tag genuinely was innermost instead. Example: `` `B777 X`f `F975`b <> `` opened a background span, then a foreground span, then tried to close the background — the emitted `</span>` actually closed the (empty) foreground span in the DOM, leaving the background open until end-of-line and desyncing the internal bookkeeping for the rest of the run. Fixed by having `_close_innermost()` unwind: close every tag above the target (innermost-first), close the target, then reopen the unwound tags as fresh elements. The tag stack now stores each entry's opening HTML alongside its closing HTML (`(type, open_html, close_html)`, was `(type, close_html)`) so it can replay the reopens; `_pop_tag()` is gone, the `` `! ``/`` `_ ``/`` `* `` branches route through `_close_innermost()` like `` `b ``/`` `f `` always did instead of inlining their own close+pop. Reported against a downstream consumer (vscode-mu-preview) as "background color not resetting after `` `b `` token" — confirmed the bug was entirely upstream here, not in the .mu source or the downstream renderer. 4 new tests in `TestTagNesting` cover the reported repro, a bold/colour interleave, a triple-nested two-level unwind, and the already-correct non-interleaved baseline.
+- **README form-field docs described broken checkbox/radio syntax.** `` `<?|name|value> `` and `` `<^|name|value> `` (no backtick before the closing `>`) look plausible but don't actually render as `<input>` elements — NomadNet's own field parser requires the backtick + label, e.g. `` `<?|name|value`label> ``. [examples/showcase.mu](examples/showcase.mu) had the same broken form. Both corrected; the mandatory-backtick rule is now called out explicitly.
+- **README security section mischaracterized the file-link block.** Said `file://` scheme links are blocked; the code actually blocks any resolved URL containing a `/file/` path segment (NomadNet's download-file convention) — an actual `file://` URL isn't specially handled. Wording corrected, and the default `hash://`-vs-custom-resolver distinction is now spelled out.
+- **README said "pure Python 3.9+".** `pyproject.toml` has required `>=3.10` since v1.0.8; README now matches.
 - **Removed stale docs for the dropped `` `FTxxxxxx ``/`` `BTxxxxxx `` inline format.** The 24-bit inline extension was removed from the parser in v1.0.2, but [README.md](README.md) and [examples/showcase.mu](examples/showcase.mu) still described/demonstrated it. Docs and the example page now only show the supported 3-hex shorthand.
+- **README's `` `Fxxx `` doubling example was missing the command letter.** Showed `F40 → #ff4400` (2 hex digits after a bare `F`, which doesn't match the actual 3-hex format); corrected to `` `FF40 → #ff4400 ``.
+
+### Added
+
+- **README documents `to_text()` and `--format text`.** Both existed and were tested but were never mentioned in the library/CLI usage sections.
+- **README documents the partials token** (`` `{URL`refresh`fields} ``), previously present in the parser with no docs and no test coverage.
+- **37 new tests**: `TestTables` (13), `TestHeadingAnchors`/`TestExplicitAnchors`/`TestAnchorLinks` (18), `TestTagNesting` (4), divider length-2 rule (2), plus rewrites of the tests covering every behavior change above (empty headings, partials data-attributes, literal-toggle removal, link field-spec strictness). Test suite: 57 → 94.
 
 ### Infrastructure
 

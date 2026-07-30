@@ -32,7 +32,7 @@ _HTML_TEMPLATE = """\
 
 
 def _bundled_css() -> str:
-    """Read the bundled MeshChat-parity stylesheet that ships with the package."""
+    """Read the bundled dark-terminal stylesheet that ships with the package."""
     css_path = os.path.join(os.path.dirname(__file__), "micron-meshchat.css")
     try:
         with open(css_path, "r", encoding="utf-8") as fh:

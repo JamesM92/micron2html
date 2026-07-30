@@ -57,6 +57,19 @@ URL only: `[`https://example.com]
 
 -~
 
+>Anchors
+
+`[Jump to the anchor below`#custom-anchor]
+`[Jump to the next heading`#]
+
+`:custom-anchor
+This paragraph is a jump target declared with an explicit anchor tag.
+
+Every heading (including this one) is also an anchor automatically — its
+slug is derived from the heading text.
+
+-~
+
 >Literal block
 
 `=
@@ -67,12 +80,23 @@ URL only: `[`https://example.com]
 
 -~
 
+>Tables
+
+`t
+| Name | Price | Qty |
+| ---- | :---: | --: |
+| `F3a3Apple`f | Free | `!5`! |
+| Orange | Ask, nicely | 3 |
+`t
+
+-~
+
 >Form fields
 
   Username:    `<20|username`>
   Password:    `<20!|password`>
-  Subscribe:   `<?|subscribe|yes|*> Yes, sign me up
-  Plan:        `<^|plan|free|*> Free  `<^|plan|pro> Pro
+  Subscribe:   `<?|subscribe|yes|*`Yes, sign me up>
+  Plan:        `<^|plan|free|*`Free>  `<^|plan|pro`Pro>
 
 -=
 
