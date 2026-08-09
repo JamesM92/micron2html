@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/), and this pro
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-08-09
+
 ### Added
 
 - **`` `FT<6hex> `` / `` `BT<6hex> `` — 24-bit exact-color escape from
