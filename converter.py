@@ -750,26 +750,40 @@ class MicronConverter:
     def _parse_color(self, text: str, i: int, n: int):
         """Parse a Micron color token after the F/B prefix.
 
-        Format: 3 hex chars — each nibble doubled (f→ff, 8→88, 0→00).
+        Two forms:
+
+          1. **3 hex chars** — each nibble doubled (f→ff, 8→88, 0→00).
+             This is the canonical form and the one MeshChat +
+             every mainstream .mu page uses.
+          2. **``T`` + 6 hex chars** — a 24-bit exact-color extension
+             from NomadNet's reference parser (e.g. ``FTrrggbb``).
+             Not portable — MeshChat doesn't render it; pages relying
+             on it will look wrong on MeshChat. Supported here for
+             feature parity with NomadNet's parser and for authors who
+             need exact colors on Micron2HTML-based clients, but
+             actively discouraged in documentation.
 
         NomadNet parity notes:
-          - Always consume the next 3 chars after F/B (if available),
-            regardless of whether they're valid hex. Both MicronParser.py
-            (`line[i+1:i+4]` + `skip = 3`) and MeshChat's MicronParser.js
-            (`line.substr(i+1,3)` + `skip = 3`) do this unconditionally.
-          - If the 3 chars aren't valid hex, no colour is applied (the
-            colour-state holds the invalid string; rendering ignores it),
-            but the 3 chars are still consumed so they don't leak as text.
-          - NomadNet's *reference parser* also accepts a `T<6hex>` 24-bit
-            form (`FTrrggbb`) — but its own Guide.py never teaches this to
-            page authors, and MeshChat doesn't implement it either. Since
-            the point of this converter is to render what real `.mu` pages
-            actually contain, not every corner of one client's source, we
-            deliberately stay 3-hex-only: any real-world page relying on
-            `FT<6hex>` wouldn't render correctly in MeshChat anyway.
+          - Always consume the next 3 (or ``T`` + 6) chars after F/B
+            if available, regardless of whether they're valid hex.
+            Both NomadNet's MicronParser.py and MeshChat's
+            MicronParser.js do this unconditionally so garbage
+            doesn't leak into rendered text.
+          - If the chars aren't valid hex, no colour is applied
+            (the colour-state holds the invalid string; rendering
+            ignores it).
 
         Returns (css_color_str | None, new_index).
         """
+        # T<6hex> exact-color extension — check BEFORE the 3-hex path
+        # so a `FTrrggbb` isn't mis-consumed as `T` + garbage.
+        if i < n and text[i] == "T" and i + 7 <= n:
+            h6 = text[i + 1:i + 7]
+            if all(c in _HEX for c in h6):
+                return "#" + h6.lower(), i + 7
+            # Invalid 6-hex — still consume ``T`` + 6 chars so they
+            # don't leak into rendered text.
+            return None, i + 7
         if i + 3 <= n:
             h3 = text[i:i + 3]
             if all(c in _HEX for c in h3):

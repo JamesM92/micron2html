@@ -242,16 +242,40 @@ class TestColors:
         assert "xxx" not in out
         assert "hello" in out
 
-    def test_24bit_T_format_not_supported(self, conv):
-        # NomadNet's own reference parser DOES accept `FT<6hex>`, but its
-        # Guide.py never teaches it and MeshChat doesn't implement it — we
-        # stay 3-hex-only to match what real page authors actually write.
-        # The `T` plus 2 next chars are consumed as a (failed) 3-char hex,
-        # leaving the tail as visible text.
+    def test_24bit_T_format_fg(self, conv):
+        # NomadNet's reference parser accepts `FT<6hex>` for exact
+        # 24-bit color. Re-added for feature parity — MeshChat still
+        # doesn't render this form, so it's actively discouraged in
+        # authoring docs, but the parser handles it correctly.
         out = conv.convert("`FT8b4513 brown`f")
-        assert "color:#8b4513" not in out
-        assert "color:#" not in out  # no colour applied
+        assert "color:#8b4513" in out
         assert "brown" in out
+        # `T + 6 hex` (7 chars) must be fully consumed — nothing leaks
+        assert "8b4513" not in out.split(">")[-1]  # no leak into text
+
+    def test_24bit_T_format_bg(self, conv):
+        # Same behaviour on the background side.
+        out = conv.convert("`BT2c3e50 dark`b")
+        assert "background-color:#2c3e50" in out
+        assert "dark" in out
+
+    def test_24bit_T_format_invalid_hex_consumes_all_seven(self, conv):
+        # Invalid 6-hex after `T` still consumes all 7 chars (the T
+        # plus the six that follow) so garbage doesn't leak as text.
+        # Matches the 3-hex parser's "always consume, apply only
+        # when valid" convention.
+        out = conv.convert("`FTzzzzzz visible`f")
+        assert "color:#" not in out
+        assert "zzzzzz" not in out
+        assert "visible" in out
+
+    def test_24bit_T_format_falls_back_when_too_short(self, conv):
+        # `FT` with fewer than 6 chars after is treated as a normal
+        # 3-hex attempt on `T??` — invalid, consumes 3 chars.
+        # Guards against a `FTab` string near end-of-input crashing
+        # or being interpreted as a partial exact-color escape.
+        out = conv.convert("`FTab")
+        assert "color:#" not in out
 
     def test_header_fg_bg_3digit(self, conv):
         out = conv.convert("#!bg=333\n#!fg=aaa\nhello")
