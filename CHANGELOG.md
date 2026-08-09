@@ -3,6 +3,27 @@
 All notable changes to Micron2HTML are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+## [1.1.1] - 2026-08-09
+
+### Added
+
+- **`` `FT<6hex> `` / `` `BT<6hex> `` — 24-bit exact-color escape from
+  NomadNet's reference parser** (e.g. `` `FT8b4513 `` for saddle-brown
+  foreground). Re-added after being dropped in earlier versions. Not
+  portable — MeshChat's `MicronParser.js` doesn't render this form —
+  so pages targeting cross-client compatibility should still use the
+  standard `` `Fxxx `` 3-hex shorthand. Intended for authors who need
+  exact colors on Micron2HTML-based renderers and are willing to
+  accept the portability cost.
+
+  Invalid or too-short input consumes the full `` T + 6 `` chars so
+  garbage doesn't leak as text, matching the 3-hex parser's
+  "always consume, apply only when valid" convention. 3-hex remains
+  the default and always-portable form; the T-prefix is checked
+  first so `` `FTrrggbb `` isn't mis-consumed as `` `FT?? ``.
+
 ## [1.1.0] - 2026-07-30
 
 ### Changed — goal correction: MeshChat parity → NomadNet parity
